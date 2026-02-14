@@ -1,5 +1,5 @@
 from sqlmodel import create_engine, SQLModel, Session
-from .models import Hero  # Ensure models are imported for metadata
+from .models import DiaryEntry  # Ensure models are imported for metadata
 
 sqlite_file_name = "database.db"
 sqlite_url = f"sqlite:///{sqlite_file_name}"

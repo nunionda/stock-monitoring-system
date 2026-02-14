@@ -1,7 +1,7 @@
 {
   "openapi": "3.1.0",
   "info": {
-    "title": "AI Coding Backend",
+    "title": "My Diary API",
     "version": "0.1.0"
   },
   "paths": {
@@ -21,10 +21,10 @@
         }
       }
     },
-    "/heroes/": {
+    "/entries/": {
       "get": {
-        "summary": "Read Heroes",
-        "operationId": "read_heroes_heroes__get",
+        "summary": "Read Entries",
+        "operationId": "read_entries_entries__get",
         "responses": {
           "200": {
             "description": "Successful Response",
@@ -32,10 +32,10 @@
               "application/json": {
                 "schema": {
                   "items": {
-                    "$ref": "#/components/schemas/Hero"
+                    "$ref": "#/components/schemas/DiaryEntry"
                   },
                   "type": "array",
-                  "title": "Response Read Heroes Heroes  Get"
+                  "title": "Response Read Entries Entries  Get"
                 }
               }
             }
@@ -43,13 +43,13 @@
         }
       },
       "post": {
-        "summary": "Create Hero",
-        "operationId": "create_hero_heroes__post",
+        "summary": "Create Entry",
+        "operationId": "create_entry_entries__post",
         "requestBody": {
           "content": {
             "application/json": {
               "schema": {
-                "$ref": "#/components/schemas/Hero"
+                "$ref": "#/components/schemas/DiaryEntry"
               }
             }
           },
@@ -61,8 +61,82 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/Hero"
+                  "$ref": "#/components/schemas/DiaryEntry"
                 }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/entries/{entry_id}": {
+      "get": {
+        "summary": "Read Entry",
+        "operationId": "read_entry_entries__entry_id__get",
+        "parameters": [
+          {
+            "name": "entry_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "title": "Entry Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DiaryEntry"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      },
+      "delete": {
+        "summary": "Delete Entry",
+        "operationId": "delete_entry_entries__entry_id__delete",
+        "parameters": [
+          {
+            "name": "entry_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "title": "Entry Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
               }
             }
           },
@@ -82,20 +156,7 @@
   },
   "components": {
     "schemas": {
-      "HTTPValidationError": {
-        "properties": {
-          "detail": {
-            "items": {
-              "$ref": "#/components/schemas/ValidationError"
-            },
-            "type": "array",
-            "title": "Detail"
-          }
-        },
-        "type": "object",
-        "title": "HTTPValidationError"
-      },
-      "Hero": {
+      "DiaryEntry": {
         "properties": {
           "id": {
             "anyOf": [
@@ -108,32 +169,50 @@
             ],
             "title": "Id"
           },
-          "name": {
+          "title": {
             "type": "string",
-            "title": "Name"
+            "title": "Title"
           },
-          "secret_name": {
+          "content": {
             "type": "string",
-            "title": "Secret Name"
+            "title": "Content"
           },
-          "age": {
+          "mood": {
             "anyOf": [
               {
-                "type": "integer"
+                "type": "string"
               },
               {
                 "type": "null"
               }
             ],
-            "title": "Age"
+            "title": "Mood"
+          },
+          "created_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Created At"
           }
         },
         "type": "object",
         "required": [
-          "name",
-          "secret_name"
+          "title",
+          "content"
         ],
-        "title": "Hero"
+        "title": "DiaryEntry"
+      },
+      "HTTPValidationError": {
+        "properties": {
+          "detail": {
+            "items": {
+              "$ref": "#/components/schemas/ValidationError"
+            },
+            "type": "array",
+            "title": "Detail"
+          }
+        },
+        "type": "object",
+        "title": "HTTPValidationError"
       },
       "ValidationError": {
         "properties": {

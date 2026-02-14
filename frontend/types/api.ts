@@ -21,19 +21,37 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/heroes/": {
+    "/entries/": {
         parameters: {
             query?: never;
             header?: never;
             path?: never;
             cookie?: never;
         };
-        /** Read Heroes */
-        get: operations["read_heroes_heroes__get"];
+        /** Read Entries */
+        get: operations["read_entries_entries__get"];
         put?: never;
-        /** Create Hero */
-        post: operations["create_hero_heroes__post"];
+        /** Create Entry */
+        post: operations["create_entry_entries__post"];
         delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/entries/{entry_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Read Entry */
+        get: operations["read_entry_entries__entry_id__get"];
+        put?: never;
+        post?: never;
+        /** Delete Entry */
+        delete: operations["delete_entry_entries__entry_id__delete"];
         options?: never;
         head?: never;
         patch?: never;
@@ -43,21 +61,26 @@ export interface paths {
 export type webhooks = Record<string, never>;
 export interface components {
     schemas: {
+        /** DiaryEntry */
+        DiaryEntry: {
+            /** Id */
+            id?: number | null;
+            /** Title */
+            title: string;
+            /** Content */
+            content: string;
+            /** Mood */
+            mood?: string | null;
+            /**
+             * Created At
+             * Format: date-time
+             */
+            created_at?: string;
+        };
         /** HTTPValidationError */
         HTTPValidationError: {
             /** Detail */
             detail?: components["schemas"]["ValidationError"][];
-        };
-        /** Hero */
-        Hero: {
-            /** Id */
-            id?: number | null;
-            /** Name */
-            name: string;
-            /** Secret Name */
-            secret_name: string;
-            /** Age */
-            age?: number | null;
         };
         /** ValidationError */
         ValidationError: {
@@ -101,7 +124,7 @@ export interface operations {
             };
         };
     };
-    read_heroes_heroes__get: {
+    read_entries_entries__get: {
         parameters: {
             query?: never;
             header?: never;
@@ -116,12 +139,12 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["Hero"][];
+                    "application/json": components["schemas"]["DiaryEntry"][];
                 };
             };
         };
     };
-    create_hero_heroes__post: {
+    create_entry_entries__post: {
         parameters: {
             query?: never;
             header?: never;
@@ -130,7 +153,7 @@ export interface operations {
         };
         requestBody: {
             content: {
-                "application/json": components["schemas"]["Hero"];
+                "application/json": components["schemas"]["DiaryEntry"];
             };
         };
         responses: {
@@ -140,7 +163,69 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["Hero"];
+                    "application/json": components["schemas"]["DiaryEntry"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    read_entry_entries__entry_id__get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                entry_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DiaryEntry"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    delete_entry_entries__entry_id__delete: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                entry_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
                 };
             };
             /** @description Validation Error */
