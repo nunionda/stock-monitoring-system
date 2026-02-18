@@ -19,3 +19,16 @@ class Trade(SQLModel, table=True):
     trade_date: datetime = Field(default_factory=datetime.utcnow)
     notes: Optional[str] = None
     created_at: datetime = Field(default_factory=datetime.utcnow)
+
+class StockDailyStat(SQLModel, table=True):
+    id: Optional[int] = Field(default=None, primary_key=True)
+    symbol: str = Field(index=True)
+    date: datetime = Field(default_factory=datetime.utcnow)
+    price: float
+    change_percent: float
+    volume: int
+    atr: Optional[float] = None
+    open: float
+    high: float
+    low: float
+    recorded_at: datetime = Field(default_factory=datetime.utcnow)

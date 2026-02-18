@@ -10,6 +10,8 @@ ENV/
 
 # Database
 backend/database.db
+database.db
+*.db
 
 # Frontend (Next.js)
 frontend/node_modules/

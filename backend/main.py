@@ -1,4 +1,5 @@
 from fastapi import FastAPI, Depends, HTTPException
+from datetime import datetime
 from fastapi.middleware.cors import CORSMiddleware
 from sqlmodel import Session, select
 from typing import List
@@ -6,7 +7,7 @@ import httpx
 import yfinance as yf
 import pandas as pd
 from backend.database import create_db_and_tables, get_session
-from backend.models import DiaryEntry, Trade
+from backend.models import DiaryEntry, Trade, StockDailyStat
 
 # Global cache for stock search
 STOCKS_CACHE = []
@@ -201,3 +202,28 @@ async def get_stock_stats(symbol: str):
     except Exception as e:
         print(f"Error fetching stats for {symbol}: {e}")
         raise HTTPException(status_code=500, detail=str(e))
+
+@app.post("/stocks/stats/record", response_model=StockDailyStat)
+async def record_stock_stats(stat: StockDailyStat, session: Session = Depends(get_session)):
+    try:
+        # Ensure date is a datetime object (sometimes pydantic might leave it as string if not validated)
+        if isinstance(stat.date, str):
+            stat.date = datetime.fromisoformat(stat.date.replace('Z', '+00:00'))
+        
+        session.add(stat)
+        session.commit()
+        session.refresh(stat)
+        return stat
+    except Exception as e:
+        print(f"Error recording stats: {e}")
+        session.rollback()
+        raise HTTPException(status_code=500, detail=str(e))
+
+@app.get("/stocks/history/{symbol}", response_model=List[StockDailyStat])
+async def get_stock_history(symbol: str, session: Session = Depends(get_session)):
+    stats = session.exec(
+        select(StockDailyStat)
+        .where(StockDailyStat.symbol == symbol)
+        .order_by(StockDailyStat.date.asc())
+    ).all()
+    return stats

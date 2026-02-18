@@ -1,5 +1,5 @@
 from sqlmodel import create_engine, SQLModel, Session
-from backend.models import DiaryEntry, Trade  # Ensure models are imported for metadata
+from backend.models import DiaryEntry, Trade, StockDailyStat  # Ensure models are imported for metadata
 
 sqlite_file_name = "database.db"
 sqlite_url = f"sqlite:///{sqlite_file_name}"
