@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect, useState } from 'react';
+import TradingViewChart from '../components/TradingViewChart';
 
 interface StockStats {
     symbol: string;
@@ -213,6 +214,13 @@ export default function MarketDashboardPage() {
                                         <p className="text-xs font-medium text-stone-400 uppercase tracking-widest">Volume</p>
                                         <p className="text-xl font-serif font-bold text-stone-800">{data.volume.toLocaleString()}</p>
                                         <p className="text-[10px] text-stone-400 italic">Shares Traded</p>
+                                    </div>
+                                </div>
+
+                                <div className="pt-6 border-t border-stone-100">
+                                    <p className="text-[10px] font-bold text-stone-400 uppercase mb-3 tracking-widest">Live Technical Chart</p>
+                                    <div className="rounded-lg overflow-hidden border border-stone-200">
+                                        <TradingViewChart symbol={symbol} />
                                     </div>
                                 </div>
 
