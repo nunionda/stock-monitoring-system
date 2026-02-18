@@ -49,6 +49,22 @@ async def on_startup():
     except Exception as e:
         print(f"Failed to load stocks cache: {e}")
         
+    # Add KOSPI Top 10 to cache
+    kospi_top_10 = [
+        {"symbol": "005930.KS", "name": "Samsung Electronics (삼성전자)", "exchange": "KRX", "type": "EQUITY"},
+        {"symbol": "000660.KS", "name": "SK Hynix (SK하이닉스)", "exchange": "KRX", "type": "EQUITY"},
+        {"symbol": "373220.KS", "name": "LG Energy Solution (LG에너지솔루션)", "exchange": "KRX", "type": "EQUITY"},
+        {"symbol": "207940.KS", "name": "Samsung Biologics (삼성바이오로직스)", "exchange": "KRX", "type": "EQUITY"},
+        {"symbol": "005380.KS", "name": "Hyundai Motor (현대자동차)", "exchange": "KRX", "type": "EQUITY"},
+        {"symbol": "005935.KS", "name": "Samsung Electronics Pref (삼성전자우)", "exchange": "KRX", "type": "EQUITY"},
+        {"symbol": "000270.KS", "name": "Kia (기아)", "exchange": "KRX", "type": "EQUITY"},
+        {"symbol": "068270.KS", "name": "Celltrion (셀트리온)", "exchange": "KRX", "type": "EQUITY"},
+        {"symbol": "105560.KS", "name": "KB Financial Group (KB금융)", "exchange": "KRX", "type": "EQUITY"},
+        {"symbol": "005490.KS", "name": "POSCO Holdings (POSCO홀딩스)", "exchange": "KRX", "type": "EQUITY"},
+    ]
+    STOCKS_CACHE.extend(kospi_top_10)
+    print(f"Added {len(kospi_top_10)} KOSPI Top 10 stocks to cache.")
+
     # Start background task for market updates
     asyncio.create_task(broadcast_market_updates())
 
