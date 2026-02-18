@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useRef } from 'react';
 import TradingViewChart from '../components/TradingViewChart';
 
 interface StockStats {
@@ -23,6 +23,7 @@ export default function MarketDashboardPage() {
     const [loading, setLoading] = useState(true);
     const [editMode, setEditMode] = useState(false);
     const [newSymbols, setNewSymbols] = useState<string[]>(['', '']);
+    const ws = useRef<WebSocket | null>(null);
 
     const names: Record<string, string> = {
         '005930.KS': 'Samsung Electronics',
@@ -43,9 +44,46 @@ export default function MarketDashboardPage() {
         }
     }, []);
 
+    // WebSocket Connection
+    useEffect(() => {
+        const connectWS = () => {
+            const socket = new WebSocket('ws://localhost:8000/ws/market');
+
+            socket.onmessage = (event) => {
+                const data = JSON.parse(event.data);
+                if (data.type === 'stock_update') {
+                    setStocks(prev => {
+                        const current = prev[data.symbol];
+                        if (!current) return prev;
+                        return {
+                            ...prev,
+                            [data.symbol]: {
+                                ...current,
+                                price: data.price,
+                                change: data.change,
+                                change_percent: data.change_percent
+                            }
+                        };
+                    });
+                }
+            };
+
+            socket.onclose = () => {
+                console.log('WebSocket closed, retrying in 5s...');
+                setTimeout(connectWS, 5000);
+            };
+
+            ws.current = socket;
+        };
+
+        connectWS();
+        return () => ws.current?.close();
+    }, []);
+
     useEffect(() => {
         if (customSymbols.length > 0 || !loading) {
             fetchAllData();
+            // Polling as fallback/backup for full stats
             const interval = setInterval(fetchStats, 60000);
             return () => clearInterval(interval);
         }

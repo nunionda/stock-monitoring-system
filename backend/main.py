@@ -1,16 +1,44 @@
-from fastapi import FastAPI, Depends, HTTPException
+from fastapi import FastAPI, Depends, HTTPException, WebSocket, WebSocketDisconnect
 from datetime import datetime
 from fastapi.middleware.cors import CORSMiddleware
 from sqlmodel import Session, select
-from typing import List
+from typing import List, Set
 import httpx
 import yfinance as yf
 import pandas as pd
+import asyncio
+import json
 from backend.database import create_db_and_tables, get_session
 from backend.models import DiaryEntry, Trade, StockDailyStat
 
 # Global cache for stock search
 STOCKS_CACHE = []
+
+# WebSocket Connection Manager
+class ConnectionManager:
+    def __init__(self):
+        self.active_connections: Set[WebSocket] = set()
+
+    async def connect(self, websocket: WebSocket):
+        await websocket.accept()
+        self.active_connections.add(websocket)
+
+    def disconnect(self, websocket: WebSocket):
+        self.active_connections.remove(websocket)
+
+    async def broadcast(self, message: dict):
+        if not self.active_connections:
+            return
+        
+        # Create a list of tasks for parallel sending
+        tasks = []
+        for connection in self.active_connections:
+            tasks.append(connection.send_text(json.dumps(message)))
+        
+        if tasks:
+            await asyncio.gather(*tasks, return_exceptions=True)
+
+manager = ConnectionManager()
 
 app = FastAPI(title="My Diary API")
 
@@ -45,6 +73,9 @@ async def on_startup():
                 print(f"Loaded {len(STOCKS_CACHE)} stocks into cache.")
     except Exception as e:
         print(f"Failed to load stocks cache: {e}")
+        
+    # Start background task for market updates
+    asyncio.create_task(broadcast_market_updates())
 
 @app.get("/")
 def read_root():
@@ -227,3 +258,56 @@ async def get_stock_history(symbol: str, session: Session = Depends(get_session)
         .order_by(StockDailyStat.date.asc())
     ).all()
     return stats
+@app.websocket("/ws/market")
+async def websocket_endpoint(websocket: WebSocket):
+    await manager.connect(websocket)
+    try:
+        while True:
+            # We don't expect messages from client for now, just keep connection open
+            await websocket.receive_text()
+    except WebSocketDisconnect:
+        manager.disconnect(websocket)
+    except Exception as e:
+        print(f"WebSocket error: {e}")
+        manager.disconnect(websocket)
+
+async def broadcast_market_updates():
+    """Background task to fetch prices and broadcast via WebSocket"""
+    while True:
+        if not manager.active_connections:
+            await asyncio.sleep(5)
+            continue
+            
+        # For now, let's fetch for the fixed ones + a few common ones
+        # In a real app, this would be dynamic based on user interests
+        symbols = ['005930.KS', '000660.KS', 'AAPL', 'NVDA', 'TSLA']
+        
+        for symbol in symbols:
+            if not manager.active_connections: break
+            try:
+                loop = asyncio.get_event_loop()
+                # fast_info is a property, but it might involve blocking IO under the hood
+                def fetch_fast():
+                    ticker = yf.Ticker(symbol)
+                    return ticker.fast_info
+                
+                info = await loop.run_in_executor(None, fetch_fast)
+                
+                update = {
+                    "type": "stock_update",
+                    "symbol": symbol,
+                    "price": round(float(info['lastPrice']), 2),
+                    "change": round(float(info['lastPrice'] - info['previousClose']), 2) if 'previousClose' in info else 0,
+                    "change_percent": round(float((info['lastPrice'] - info['previousClose']) / info['previousClose'] * 100), 2) if 'previousClose' in info and info['previousClose'] != 0 else 0,
+                    "timestamp": datetime.utcnow().isoformat()
+                }
+                await manager.broadcast(update)
+                # Small sleep to avoid hammering yfinance too hard in one burst
+                await asyncio.sleep(1)
+            except Exception as e:
+                # Don't print every fail if it's just yfinance being slow/rate limited
+                if "rate limit" in str(e).lower():
+                    await asyncio.sleep(10)
+                continue
+        
+        await asyncio.sleep(5) # Delay between full sweeps
