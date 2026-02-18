@@ -1,4 +1,5 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
+import { API_BASE_URL, WS_BASE_URL } from '../utils/config';
 
 export interface StockStats {
     symbol: string;
@@ -23,7 +24,7 @@ export const useMarketData = (fixedSymbols: string[], customSymbols: string[]) =
         for (const symbol of symbols) {
             if (!symbol) continue;
             try {
-                const res = await fetch(`http://localhost:8000/stocks/stats/${symbol}`);
+                const res = await fetch(`${API_BASE_URL}/stocks/stats/${symbol}`);
                 if (res.ok) {
                     results[symbol] = await res.json();
                 }
@@ -36,7 +37,7 @@ export const useMarketData = (fixedSymbols: string[], customSymbols: string[]) =
 
     const fetchHistory = useCallback(async (symbol: string) => {
         try {
-            const res = await fetch(`http://localhost:8000/stocks/history/${symbol}`);
+            const res = await fetch(`${API_BASE_URL}/stocks/history/${symbol}`);
             if (res.ok) {
                 const data = await res.json();
                 setHistory(prev => ({ ...prev, [symbol]: data }));
@@ -65,7 +66,7 @@ export const useMarketData = (fixedSymbols: string[], customSymbols: string[]) =
     // WebSocket Connection
     useEffect(() => {
         const connectWS = () => {
-            const socket = new WebSocket('ws://localhost:8000/ws/market');
+            const socket = new WebSocket(`${WS_BASE_URL}/ws/market`);
 
             socket.onmessage = (event) => {
                 const data = JSON.parse(event.data);
@@ -104,7 +105,7 @@ export const useMarketData = (fixedSymbols: string[], customSymbols: string[]) =
 
         try {
             const payload = { ...data, date: new Date().toISOString() };
-            const res = await fetch('http://localhost:8000/stocks/stats/record', {
+            const res = await fetch(`${API_BASE_URL}/stocks/stats/record`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify(payload),

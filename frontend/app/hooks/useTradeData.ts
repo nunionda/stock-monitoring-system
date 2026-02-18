@@ -1,5 +1,6 @@
 import { useState, useEffect, useCallback, useMemo } from 'react';
 import { components } from '../../types/api';
+import { API_BASE_URL } from '../utils/config';
 
 type Trade = components['schemas']['Trade'];
 
@@ -10,7 +11,7 @@ export const useTradeData = () => {
 
     const fetchTrades = useCallback(async () => {
         try {
-            const res = await fetch('http://localhost:8000/trades/');
+            const res = await fetch(`${API_BASE_URL}/trades/`);
             if (res.ok) {
                 const data = await res.json();
                 setTrades(data);
@@ -25,7 +26,7 @@ export const useTradeData = () => {
     const updateMarketPrices = useCallback(async (symbols: string[]) => {
         if (symbols.length === 0) return;
         try {
-            const res = await fetch('http://localhost:8000/stocks/prices/', {
+            const res = await fetch(`${API_BASE_URL}/stocks/prices/`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify(symbols),
@@ -97,7 +98,7 @@ export const useTradeData = () => {
     const deleteTrade = async (id: number) => {
         if (!confirm('Are you sure you want to delete this trade?')) return false;
         try {
-            const res = await fetch(`http://localhost:8000/trades/${id}`, { method: 'DELETE' });
+            const res = await fetch(`${API_BASE_URL}/trades/${id}`, { method: 'DELETE' });
             if (res.ok) {
                 setTrades(prev => prev.filter(t => t.id !== id));
                 return true;

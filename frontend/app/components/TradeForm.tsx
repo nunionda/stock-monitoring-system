@@ -2,6 +2,8 @@
 
 import { useState } from 'react';
 import { components } from '../../types/api';
+import { useStockSearch } from '../hooks/useStockSearch';
+import { API_BASE_URL } from '../utils/config';
 
 type Trade = components['schemas']['Trade'];
 
@@ -16,55 +18,22 @@ export default function TradeForm({ onTradeAdded }: TradeFormProps) {
     const [quantity, setQuantity] = useState('');
     const [notes, setNotes] = useState('');
     const [submitting, setSubmitting] = useState(false);
-
-    const [suggestions, setSuggestions] = useState<any[]>([]);
     const [showSuggestions, setShowSuggestions] = useState(false);
-    const [searchTimeout, setSearchTimeout] = useState<NodeJS.Timeout | null>(null);
+
+    const { suggestions, searchStocks, fetchPrice, setSuggestions } = useStockSearch();
 
     const handleStockNameChange = (val: string) => {
         setStockName(val);
-
-        if (searchTimeout) clearTimeout(searchTimeout);
-
-        if (val.length < 2) {
-            setSuggestions([]);
-            setShowSuggestions(false);
-            return;
-        }
-
-        const timeout = setTimeout(async () => {
-            try {
-                const res = await fetch(`http://localhost:8000/stocks/search?q=${val}`);
-                if (res.ok) {
-                    const data = await res.json();
-                    setSuggestions(data);
-                    setShowSuggestions(true);
-                }
-            } catch (err) {
-                console.error('Search failed:', err);
-            }
-        }, 300);
-
-        setSearchTimeout(timeout);
+        searchStocks(val);
+        setShowSuggestions(val.length >= 2);
     };
 
-    const handleFetchPrice = async (symbol: string) => {
-        try {
-            const res = await fetch(`http://localhost:8000/stocks/price/${symbol}`);
-            if (res.ok) {
-                const data = await res.json();
-                setPrice(data.price.toString());
-            }
-        } catch (err) {
-            console.error('Price fetch failed:', err);
-        }
-    };
-
-    const handleSelectSuggestion = (s: any) => {
+    const handleSelectSuggestion = async (s: any) => {
         setStockName(s.symbol);
         setSuggestions([]);
         setShowSuggestions(false);
-        handleFetchPrice(s.symbol);
+        const p = await fetchPrice(s.symbol);
+        if (p) setPrice(p.toString());
     };
 
     const handleSubmit = async (e: React.FormEvent) => {
@@ -80,18 +49,15 @@ export default function TradeForm({ onTradeAdded }: TradeFormProps) {
         };
 
         try {
-            const res = await fetch('http://localhost:8000/trades/', {
+            const res = await fetch(`${API_BASE_URL}/trades/`, {
                 method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                },
+                headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify(newTrade),
             });
 
             if (res.ok) {
                 const data = await res.json();
                 onTradeAdded(data);
-                // Reset form
                 setStockName('');
                 setPrice('');
                 setQuantity('');
@@ -153,7 +119,10 @@ export default function TradeForm({ onTradeAdded }: TradeFormProps) {
                         {stockName && (
                             <button
                                 type="button"
-                                onClick={() => handleFetchPrice(stockName)}
+                                onClick={async () => {
+                                    const p = await fetchPrice(stockName);
+                                    if (p) setPrice(p.toString());
+                                }}
                                 className="text-[10px] text-stone-400 hover:text-stone-900 transition-colors uppercase tracking-tighter"
                             >
                                 Fetch Price
