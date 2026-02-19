@@ -24,11 +24,11 @@ export default function HistoryTable({ symbol, history }: HistoryTableProps) {
                     <tbody className="divide-y divide-stone-100">
                         {[...history].reverse().slice(0, 5).map((h, i) => (
                             <tr key={i} className="text-stone-600">
-                                <td className="py-2">{new Date(h.date).toLocaleDateString()}</td>
-                                <td className="py-2 font-medium">{symbol.endsWith('.KS') ? '₩' : '$'}{h.price.toLocaleString()}</td>
+                                <td className="py-2">{h.date ? new Date(h.date).toLocaleDateString() : 'N/A'}</td>
+                                <td className="py-2 font-medium">{symbol.endsWith('.KS') ? '₩' : '$'}{(h.price ?? 0).toLocaleString()}</td>
                                 <td className="py-2">{symbol.endsWith('.KS') ? '₩' : '$'}{h.atr?.toLocaleString() || '-'}</td>
-                                <td className={`py-2 text-right font-bold ${h.change_percent >= 0 ? 'text-green-500' : 'text-red-500'}`}>
-                                    {h.change_percent > 0 ? '+' : ''}{h.change_percent}%
+                                <td className={`py-2 text-right font-bold ${(h.change_percent ?? 0) >= 0 ? 'text-green-500' : 'text-red-500'}`}>
+                                    {(h.change_percent ?? 0) > 0 ? '+' : ''}{h.change_percent ?? 0}%
                                 </td>
                             </tr>
                         ))}

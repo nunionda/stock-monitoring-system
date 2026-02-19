@@ -4,6 +4,11 @@
 
 echo "🚀 Starting Portfolio Suite Servers..."
 
+# Auto-cleanup occupied ports
+echo "🧹 Cleaning up existing processes..."
+lsof -ti:8000 | xargs kill -9 2>/dev/null
+lsof -ti:3000 | xargs kill -9 2>/dev/null
+
 # Function to handle cleanup on exit
 cleanup() {
     echo ""
@@ -17,7 +22,7 @@ trap cleanup SIGINT SIGTERM
 # 1. Start Backend Server (FastAPI)
 echo "------------------------------------------------"
 echo "📦 Starting Backend Server (FastAPI)..."
-uvicorn backend.main:app --reload --port 8000 &
+python3 -m uvicorn backend.main:app --reload --port 8000 &
 
 # 2. Start Frontend Server (Next.js)
 echo "🎨 Starting Frontend Server (Next.js)..."

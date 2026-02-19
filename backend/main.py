@@ -4,14 +4,17 @@ import httpx
 import asyncio
 from backend.database import create_db_and_tables
 from backend.ws_manager import manager
-from backend.tasks import broadcast_market_updates
+from backend.tasks import broadcast_market_updates, auto_record_daily_stats
 from backend.routers import entries, trades, stocks
+
+import platform
+import sys
 
 app = FastAPI(title="Portfolio Suite API")
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["http://localhost:3000"],
+    allow_origins=["*"], # Broaden for local development flexibility
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -20,6 +23,15 @@ app.add_middleware(
 app.include_router(entries.router)
 app.include_router(trades.router)
 app.include_router(stocks.router)
+
+@app.get("/health")
+def health_check():
+    return {
+        "status": "healthy",
+        "python_version": sys.version,
+        "platform": platform.platform(),
+        "api_title": app.title
+    }
 
 @app.on_event("startup")
 async def on_startup():
@@ -60,8 +72,9 @@ async def on_startup():
     stocks.STOCKS_CACHE.extend(kospi_top_10)
     print(f"Loaded {len(stocks.STOCKS_CACHE)} stocks into cache.")
 
-    # Start background task for market updates
+    # Start background tasks
     asyncio.create_task(broadcast_market_updates())
+    asyncio.create_task(auto_record_daily_stats())
 
 @app.get("/")
 def read_root():

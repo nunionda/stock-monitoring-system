@@ -11,7 +11,7 @@ interface StockCardProps {
 }
 
 export default function StockCard({ symbol, data, name, isFixed, onRecord }: StockCardProps) {
-    const isPositive = data.change >= 0;
+    const isPositive = (data.change ?? 0) >= 0;
 
     return (
         <div className={`bg-white p-6 rounded-lg border ${isFixed ? 'border-stone-200' : 'border-stone-400 shadow-md'} shadow-sm space-y-6 relative overflow-hidden`}>
@@ -23,10 +23,10 @@ export default function StockCard({ symbol, data, name, isFixed, onRecord }: Sto
                 </div>
                 <div className="text-right">
                     <p className="text-3xl font-serif font-bold text-stone-900">
-                        {symbol.endsWith('.KS') ? '₩' : '$'}{data.price.toLocaleString()}
+                        {symbol.endsWith('.KS') ? '₩' : '$'}{(data.price ?? 0).toLocaleString()}
                     </p>
                     <p className={`text-sm font-bold ${isPositive ? 'text-green-600' : 'text-red-600'}`}>
-                        {isPositive ? '▲' : '▼'} {Math.abs(data.change).toLocaleString()} ({Math.abs(data.change_percent)}%)
+                        {isPositive ? '▲' : '▼'} {Math.abs(data.change ?? 0).toLocaleString()} ({Math.abs(data.change_percent ?? 0)}%)
                     </p>
                 </div>
             </div>
@@ -39,7 +39,7 @@ export default function StockCard({ symbol, data, name, isFixed, onRecord }: Sto
                 </div>
                 <div className="space-y-1">
                     <p className="text-xs font-medium text-stone-400 uppercase tracking-widest">Volume</p>
-                    <p className="text-xl font-serif font-bold text-stone-800">{data.volume.toLocaleString()}</p>
+                    <p className="text-xl font-serif font-bold text-stone-800">{(data.volume ?? 0).toLocaleString()}</p>
                     <p className="text-[10px] text-stone-400 italic">Shares Traded</p>
                 </div>
             </div>

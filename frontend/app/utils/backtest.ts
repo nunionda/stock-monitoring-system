@@ -9,7 +9,19 @@ export interface BacktestResult {
     totalCosts: number;
     profitFactor: number;
     averageHoldTime: number; // In days/candles
+    buyAndHoldReturn: number;
+    alphaVsBenchmark: number;
+    activePosition: ActivePosition | null;
     trades: BacktestTrade[];
+}
+
+export interface ActivePosition {
+    type: 'LONG' | 'SHORT';
+    avgEntryPrice: number;
+    weight: number;
+    floatingProfit: number;
+    floatingReturn: number;
+    entryDate: string;
 }
 
 export interface BacktestTrade {
@@ -50,19 +62,24 @@ export async function runBacktest(
             totalCosts: 0,
             profitFactor: 0,
             averageHoldTime: 0,
+            buyAndHoldReturn: 0,
+            alphaVsBenchmark: 0,
+            activePosition: null,
             trades: []
         };
     }
 
     const strategy = new AntiGravityStrategy();
-    const { ENTRY_MULTIPLIER, ENTRY_2_MULTIPLIER } = DEFAULT_CONFIG;
+    const { ENTRY_MULTIPLIER, ENTRY_2_MULTIPLIER, PROFIT_TAKE_MULTIPLIER } = DEFAULT_CONFIG;
     const trades: BacktestTrade[] = [];
     let currentPosition: {
         type: 'LONG' | 'SHORT';
         entryPrice: number;
         entryDate: string;
         entryIndex: number;
-        weight: number; // 0.5 or 1.0
+        weight: number;
+        partialExitTaken: boolean;
+        avgEntryPrice: number; // Keep track of original average entry for breakeven
     } | null = null;
 
     let equity = 100000;
@@ -74,7 +91,8 @@ export async function runBacktest(
 
     for (let i = 22; i < candles.length; i++) {
         const slice = candles.slice(0, i + 1);
-        const result = strategy.generateSignal(slice);
+        const currentWeight = currentPosition ? currentPosition.weight : 0;
+        const result = strategy.generateSignal(slice, currentWeight);
         if (!result) continue;
 
         const currentCandle = candles[i];
@@ -83,6 +101,50 @@ export async function runBacktest(
 
         // Check for exits (Exits apply to entire position)
         if (currentPosition) {
+            // 1. Partial Profit Taking (50% of weight)
+            if (!currentPosition.partialExitTaken) {
+                const profitTarget = currentPosition.type === 'LONG'
+                    ? currentPosition.avgEntryPrice + (atr * PROFIT_TAKE_MULTIPLIER)
+                    : currentPosition.avgEntryPrice - (atr * PROFIT_TAKE_MULTIPLIER);
+
+                const isTargetHit = currentPosition.type === 'LONG'
+                    ? currentCandle.high >= profitTarget
+                    : currentCandle.low <= profitTarget;
+
+                if (isTargetHit) {
+                    const exitPrice = profitTarget; // Assume exit at target
+                    const partialWeight = currentPosition.weight * 0.5;
+                    const netProfit = currentPosition.type === 'LONG'
+                        ? (exitPrice * (1 - SLIPPAGE) - currentPosition.avgEntryPrice) * partialWeight
+                        : (currentPosition.avgEntryPrice - exitPrice * (1 + SLIPPAGE)) * partialWeight;
+
+                    const slippageImpact = Math.abs(exitPrice * SLIPPAGE) * partialWeight;
+                    totalCosts += slippageImpact + TRANSACTION_FEE;
+
+                    const returnPercent = (netProfit / (currentPosition.avgEntryPrice * partialWeight)) * 100;
+                    netEquity *= (1 + returnPercent / 100);
+
+                    trades.push({
+                        type: currentPosition.type,
+                        entryDate: currentPosition.entryDate,
+                        entryPrice: currentPosition.avgEntryPrice,
+                        entryIndex: currentPosition.entryIndex,
+                        exitDate: currentCandle.date,
+                        exitPrice: exitPrice,
+                        exitIndex: i,
+                        profit: netProfit,
+                        returnPercent: (netProfit / (currentPosition.avgEntryPrice * currentPosition.weight)) * 100,
+                        cost: slippageImpact + TRANSACTION_FEE
+                    });
+
+                    currentPosition.weight -= partialWeight;
+                    currentPosition.partialExitTaken = true;
+                    // Move remaining position to breakeven stop by updating entryPrice used in exit calc
+                    // (Actually we keep avgEntryPrice for reference but the logic below uses entryPrice)
+                }
+            }
+
+            // 2. Full Exit (Exits apply to remaining weight)
             let shouldExit = false;
             if (currentPosition.type === 'LONG' && (result.signal === 'EXIT_LONG' || result.signal === 'STRONG_SELL')) {
                 shouldExit = true;
@@ -90,30 +152,30 @@ export async function runBacktest(
                 shouldExit = true;
             }
 
-            if (shouldExit) {
-                // Apply Slippage to Exit
-                const exitPriceWithSlippage = currentPosition.type === 'LONG'
-                    ? currentCandle.close * (1 - SLIPPAGE)
-                    : currentCandle.close * (1 + SLIPPAGE);
+            // Breakeven Stop (if partial exit taken)
+            if (currentPosition.partialExitTaken) {
+                const isBreakevenHit = currentPosition.type === 'LONG'
+                    ? currentCandle.close < currentPosition.avgEntryPrice
+                    : currentCandle.close > currentPosition.avgEntryPrice;
+                if (isBreakevenHit) shouldExit = true;
+            }
 
-                const rawProfit = currentPosition.type === 'LONG'
-                    ? (currentCandle.close - currentPosition.entryPrice) * currentPosition.weight
-                    : (currentPosition.entryPrice - currentCandle.close) * currentPosition.weight;
+            if (shouldExit) {
+                const exitPrice = currentCandle.close;
+                const exitPriceWithSlippage = currentPosition.type === 'LONG'
+                    ? exitPrice * (1 - SLIPPAGE)
+                    : exitPrice * (1 + SLIPPAGE);
 
                 const netProfit = currentPosition.type === 'LONG'
-                    ? (exitPriceWithSlippage - currentPosition.entryPrice) * currentPosition.weight
-                    : (currentPosition.entryPrice - exitPriceWithSlippage) * currentPosition.weight;
+                    ? (exitPriceWithSlippage - currentPosition.avgEntryPrice) * currentPosition.weight
+                    : (currentPosition.avgEntryPrice - exitPriceWithSlippage) * currentPosition.weight;
 
-                // Costs
-                const slippageImpact = Math.abs(currentCandle.close - exitPriceWithSlippage) * currentPosition.weight;
+                const slippageImpact = Math.abs(exitPrice * SLIPPAGE) * currentPosition.weight;
                 const tradeCost = slippageImpact + TRANSACTION_FEE;
                 totalCosts += tradeCost;
 
-                const returnPercent = (rawProfit / currentPosition.entryPrice) * 100;
-                const netReturnPercent = (netProfit / currentPosition.entryPrice) * 100;
-
-                equity *= (1 + returnPercent / 100);
-                netEquity *= (1 + (netReturnPercent - (TRANSACTION_FEE / currentPosition.entryPrice * 100)) / 100);
+                const netReturnPercent = (netProfit / (currentPosition.avgEntryPrice * currentPosition.weight)) * 100;
+                netEquity *= (1 + netReturnPercent / 100);
 
                 if (netEquity > peakEquity) peakEquity = netEquity;
                 const dd = (peakEquity - netEquity) / peakEquity;
@@ -122,48 +184,48 @@ export async function runBacktest(
                 trades.push({
                     type: currentPosition.type,
                     entryDate: currentPosition.entryDate,
-                    entryPrice: currentPosition.entryPrice,
+                    entryPrice: currentPosition.avgEntryPrice,
                     entryIndex: currentPosition.entryIndex,
                     exitDate: currentCandle.date,
                     exitPrice: currentCandle.close,
                     exitIndex: i,
-                    profit: rawProfit,
-                    returnPercent,
+                    profit: netProfit,
+                    returnPercent: netReturnPercent,
                     cost: tradeCost
                 });
                 currentPosition = null;
             }
         }
 
-        // ENTRY & PYRAMIDING Check
-        if (result.signal === 'STRONG_BUY' || result.signal === 'STRONG_SELL') {
-            const isLong = result.signal === 'STRONG_BUY';
-            const entryLevel1 = isLong ? (sma20 + atr * ENTRY_MULTIPLIER) : (sma20 - atr * ENTRY_MULTIPLIER);
-            const entryLevel2 = isLong ? (sma20 + atr * ENTRY_2_MULTIPLIER) : (sma20 - atr * ENTRY_2_MULTIPLIER);
+        // 3. Entry Logic
+        if (!currentPosition) {
+            if (result.signal === 'STRONG_BUY' || result.signal === 'STRONG_SELL') {
+                const isLong = result.signal === 'STRONG_BUY';
+                const weight = result.positionSize * 0.5; // Initial stage
+                const entryPrice = isLong ? currentCandle.close * (1 + SLIPPAGE) : currentCandle.close * (1 - SLIPPAGE);
 
-            if (!currentPosition) {
-                // 1st Entry (50% weight)
-                const entryPriceWithSlippage = isLong ? currentCandle.close * (1 + SLIPPAGE) : currentCandle.close * (1 - SLIPPAGE);
                 currentPosition = {
                     type: isLong ? 'LONG' : 'SHORT',
-                    entryPrice: entryPriceWithSlippage,
+                    entryPrice: entryPrice,
+                    avgEntryPrice: entryPrice,
                     entryDate: currentCandle.date,
                     entryIndex: i,
-                    weight: 0.5
+                    weight: weight,
+                    partialExitTaken: false
                 };
-                totalCosts += TRANSACTION_FEE; // 1st leg fee
-            } else if (currentPosition.weight === 0.5 && currentPosition.type === (isLong ? 'LONG' : 'SHORT')) {
-                // 2nd Entry (Pyramid)
-                const isPyramidTriggered = isLong ? currentCandle.close > entryLevel2 : currentCandle.close < entryLevel2;
-                if (isPyramidTriggered) {
-                    const entryPrice2WithSlippage = isLong ? currentCandle.close * (1 + SLIPPAGE) : currentCandle.close * (1 - SLIPPAGE);
-                    // Average the entry price for the combined position
-                    const totalWeight = 1.0;
-                    const avgEntryPrice = (currentPosition.entryPrice * 0.5 + entryPrice2WithSlippage * 0.5) / totalWeight;
-
-                    currentPosition.entryPrice = avgEntryPrice;
-                    currentPosition.weight = 1.0;
-                    totalCosts += TRANSACTION_FEE; // 2nd leg fee
+                totalCosts += (entryPrice * SLIPPAGE * weight) + TRANSACTION_FEE;
+            }
+        } else {
+            // Pyramiding stage
+            if ((result.signal === 'PYRAMID_BUY' && currentPosition.type === 'LONG') ||
+                (result.signal === 'PYRAMID_SELL' && currentPosition.type === 'SHORT')) {
+                if (currentPosition.weight < result.positionSize) {
+                    const addWeight = Math.min(0.5, result.positionSize - currentPosition.weight);
+                    const entryPrice = currentPosition.type === 'LONG' ? currentCandle.close * (1 + SLIPPAGE) : currentCandle.close * (1 - SLIPPAGE);
+                    const newTotalWeight = currentPosition.weight + addWeight;
+                    currentPosition.avgEntryPrice = (currentPosition.avgEntryPrice * currentPosition.weight + entryPrice * addWeight) / newTotalWeight;
+                    currentPosition.weight = newTotalWeight;
+                    totalCosts += (entryPrice * SLIPPAGE * addWeight) + TRANSACTION_FEE;
                 }
             }
         }
@@ -172,8 +234,16 @@ export async function runBacktest(
     const netTradeProfits = trades.map(t => t.profit - t.cost);
     const wins = netTradeProfits.filter(p => p > 0).length;
     const winRate = trades.length > 0 ? (wins / trades.length) * 100 : 0;
-    const totalReturn = ((equity - initialEquity) / initialEquity) * 100;
+
+    // Compounding Net Return calculation
     const netReturnAfterCosts = ((netEquity - initialEquity) / initialEquity) * 100;
+    const totalReturn = ((equity - initialEquity) / initialEquity) * 100;
+
+    // Benchmark Analysis (S&P 500 Buy & Hold)
+    const firstPrice = candles[22].close;
+    const lastPrice = candles[candles.length - 1].close;
+    const buyAndHoldReturn = ((lastPrice - firstPrice) / firstPrice) * 100;
+    const alphaVsBenchmark = netReturnAfterCosts - buyAndHoldReturn;
 
     // Advanced Metrics
     const totalProfit = netTradeProfits.filter(p => p > 0).reduce((a, b) => a + b, 0);
@@ -182,6 +252,25 @@ export async function runBacktest(
 
     const totalHoldTime = trades.reduce((acc, t) => acc + (t.exitIndex - t.entryIndex), 0);
     const averageHoldTime = trades.length > 0 ? totalHoldTime / trades.length : 0;
+
+    // Current Active Position Analysis
+    let activePosition: ActivePosition | null = null;
+    if (currentPosition) {
+        const lastCandle = candles[candles.length - 1];
+        const floatingProfit = currentPosition.type === 'LONG'
+            ? (lastCandle.close - currentPosition.avgEntryPrice) * currentPosition.weight
+            : (currentPosition.avgEntryPrice - lastCandle.close) * currentPosition.weight;
+        const floatingReturn = (floatingProfit / (currentPosition.avgEntryPrice * currentPosition.weight)) * 100;
+
+        activePosition = {
+            type: currentPosition.type,
+            avgEntryPrice: currentPosition.avgEntryPrice,
+            weight: currentPosition.weight,
+            floatingProfit,
+            floatingReturn,
+            entryDate: currentPosition.entryDate
+        };
+    }
 
     return {
         totalTrades: trades.length,
@@ -192,6 +281,9 @@ export async function runBacktest(
         totalCosts,
         profitFactor,
         averageHoldTime,
+        buyAndHoldReturn,
+        alphaVsBenchmark,
+        activePosition,
         trades
     };
 }

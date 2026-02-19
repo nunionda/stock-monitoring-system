@@ -19,22 +19,29 @@ export const useMarketData = (fixedSymbols: string[], customSymbols: string[]) =
     const [history, setHistory] = useState<Record<string, any[]>>({});
     const [candles, setCandles] = useState<Record<string, Candle[]>>({});
     const [loading, setLoading] = useState(true);
+    const [error, setError] = useState<string | null>(null);
     const ws = useRef<WebSocket | null>(null);
 
     const fetchStats = useCallback(async (symbols: string[]) => {
         const results: Record<string, StockStats | null> = {};
+        let fetchError = null;
         for (const symbol of symbols) {
             if (!symbol) continue;
             try {
                 const res = await fetch(`${API_BASE_URL}/stocks/stats/${symbol}`);
                 if (res.ok) {
                     results[symbol] = await res.json();
+                } else {
+                    const errorText = await res.text();
+                    fetchError = `Backend Error (${res.status}): ${errorText || 'Internal Server Error'}`;
                 }
             } catch (err) {
                 console.error(`Failed to fetch stats for ${symbol}:`, err);
+                fetchError = `Connection Failed: Please check if the backend server is running at ${API_BASE_URL}`;
             }
         }
         setStocks(prev => ({ ...prev, ...results }));
+        setError(fetchError);
     }, []);
 
     const fetchHistory = useCallback(async (symbol: string) => {
@@ -137,5 +144,5 @@ export const useMarketData = (fixedSymbols: string[], customSymbols: string[]) =
         return false;
     };
 
-    return { stocks, history, candles, loading, recordStat, refreshHistory: fetchHistory };
+    return { stocks, history, candles, loading, error, recordStat, refreshHistory: fetchHistory, refreshAll: fetchAllData };
 };
