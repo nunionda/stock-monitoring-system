@@ -7,6 +7,10 @@ import HistoryTable from '../components/HistoryTable';
 import { AntiGravityStrategy, Candle } from '../utils/strategy';
 import { runBacktest, BacktestResult } from '../utils/backtest';
 import { API_BASE_URL } from '../utils/config';
+import { TradeMonitor } from '../components/dashboard/TradeMonitor';
+import { RiskMetrics } from '../components/dashboard/RiskMetrics';
+import { AlgorithmInsight } from '../components/dashboard/AlgorithmInsight';
+import { BacktestAnalysis } from '../components/dashboard/BacktestAnalysis';
 
 export default function MarketDashboardPage() {
     const symbol = 'ES=F';
@@ -132,160 +136,16 @@ export default function MarketDashboardPage() {
 
                     <div className="space-y-8">
                         {/* Live / Manual Trade Monitor */}
-                        <div className="bg-stone-900 p-6 rounded-lg border border-stone-700 shadow-xl space-y-4 relative overflow-hidden">
-                            <div className="absolute top-0 right-0 p-2 opacity-10 pointer-events-none">
-                                <svg className="w-32 h-32 text-white" fill="currentColor" viewBox="0 0 24 24"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-1 14H9v-2h2v2zm1-5c-.55 0-1-.45-1-1s.45-1 1-1 1 .45 1 1-.45 1-1 1zm0-4c1.66 0 3 1.34 3 3s-1.34 3-3 3-3-1.34-3-3 1.34-3 3-3z" /></svg>
-                            </div>
+                        <TradeMonitor
+                            symbol={symbol}
+                            data={data}
+                            backtestResult={backtestResult}
+                            strategyResult={strategyResult}
+                        />
 
-                            <h3 className="text-[10px] font-bold text-amber-500 uppercase tracking-widest border-b border-stone-800 pb-2 flex justify-between items-center z-10 relative">
-                                Trade Monitor (1 Contract)
-                                <span className="flex h-2 w-2 relative">
-                                    <span className="animate-ping absolute inline-flex h-2 w-2 rounded-full bg-amber-400 opacity-75"></span>
-                                    <span className="relative inline-flex rounded-full h-2 w-2 bg-amber-500"></span>
-                                </span>
-                            </h3>
+                        {strategyResult && <RiskMetrics strategyResult={strategyResult} />}
 
-                            {/* Manual Override Controls (Hidden by default, can be toggled or used as simulation) */}
-                            {/* For this specific request, we hardcode the simulation of the user's requested Short */}
-                            <div className="z-10 relative space-y-4">
-                                <div className="grid grid-cols-2 gap-8">
-                                    <div>
-                                        <p className="text-[10px] text-stone-500 font-bold uppercase mb-1">Position</p>
-                                        <div className="flex items-baseline gap-2">
-                                            <span className="text-3xl font-serif font-bold text-rose-500">SHORT</span>
-                                            <span className="text-sm text-stone-400 font-mono">x1 Cont</span>
-                                        </div>
-                                        <p className="text-[9px] text-stone-600 mt-1">Entry: <span className="text-stone-300">6872.50</span></p>
-                                    </div>
-                                    <div className="text-right">
-                                        <p className="text-[10px] text-stone-500 font-bold uppercase mb-1">Unrealized P&L</p>
-                                        <p className={`text-3xl font-serif font-bold ${(data?.price || 6872.50) < 6872.50 ? 'text-emerald-400' : 'text-rose-500'
-                                            }`}>
-                                            {data?.price ? (
-                                                <>
-                                                    {((6872.50 - data.price) * 50).toLocaleString('en-US', { style: 'currency', currency: 'USD' })}
-                                                </>
-                                            ) : '$0.00'}
-                                        </p>
-                                        <p className="text-[9px] text-stone-500 mt-1">
-                                            {(data?.price || 6872.50) < 6872.50 ? '+' : ''}
-                                            {data?.price ? (6872.50 - data.price).toFixed(2) : '0.00'} pts
-                                        </p>
-                                    </div>
-                                </div>
-
-                                {/* Risk Management Levels */}
-                                <div className="grid grid-cols-3 gap-2 pt-4 border-t border-stone-800">
-                                    <div className="bg-stone-800/50 p-2 rounded border border-rose-900/30">
-                                        <p className="text-[9px] text-rose-400 font-bold uppercase">Stop Loss</p>
-                                        <p className="text-lg font-mono text-stone-200">6885.50</p>
-                                        <p className="text-[8px] text-stone-500">-13.0 pts (1 ATR)</p>
-                                    </div>
-                                    <div className="bg-stone-800/50 p-2 rounded border border-stone-700/30">
-                                        <p className="text-[9px] text-stone-400 font-bold uppercase">Breakeven</p>
-                                        <p className="text-lg font-mono text-stone-400">6860.00</p>
-                                        <p className="text-[8px] text-stone-500">Auto-Trigger</p>
-                                    </div>
-                                    <div className="bg-stone-800/50 p-2 rounded border border-emerald-900/30">
-                                        <p className="text-[9px] text-emerald-400 font-bold uppercase">Take Profit</p>
-                                        <p className="text-lg font-mono text-stone-200">6840.50</p>
-                                        <p className="text-[8px] text-stone-500">+32.0 pts (2.5 ATR)</p>
-                                    </div>
-                                </div>
-                                <div className="text-center pt-2">
-                                    <p className="text-[9px] text-stone-600 uppercase tracking-widest">
-                                        Strategy V5 Auto-Monitor Active
-                                    </p>
-                                </div>
-                            </div>
-                        </div>
-
-                        {strategyResult && (
-                            <div className="bg-white p-6 rounded-lg border border-stone-200 shadow-sm space-y-4">
-                                <h3 className="text-sm font-bold text-stone-400 uppercase tracking-widest border-b border-stone-50 pb-2 flex justify-between items-center">
-                                    Risk Metrics
-                                    <span className="text-[8px] bg-stone-100 px-1 rounded text-stone-500">Live</span>
-                                </h3>
-                                <div className="grid grid-cols-1 gap-6">
-                                    <div className="group">
-                                        <p className="text-[10px] text-stone-400 font-bold uppercase tracking-tighter">Wilder ATR (14d)</p>
-                                        <p className="text-2xl font-serif font-bold text-stone-800 transition-colors group-hover:text-blue-600">${strategyResult.atr}</p>
-                                    </div>
-                                    <div className="group">
-                                        <div className="flex justify-between items-baseline">
-                                            <p className="text-[10px] text-stone-400 font-bold uppercase tracking-tighter">
-                                                Initial Stop Loss {strategyResult.price > parseFloat(strategyResult.stopLoss || '0') ? '(Long)' : '(Short)'}
-                                            </p>
-                                            <span className="text-[8px] text-stone-300">1.0x ATR</span>
-                                        </div>
-                                        <p className={`text-2xl font-serif font-bold transition-transform group-hover:scale-105 origin-left ${strategyResult.price > parseFloat(strategyResult.stopLoss || '0') ? 'text-rose-500' : 'text-rose-600'}`}>
-                                            ${(strategyResult.stopLoss || '0')}
-                                        </p>
-                                    </div>
-                                    <div className="group">
-                                        <div className="flex justify-between items-baseline">
-                                            <p className="text-[10px] text-stone-400 font-bold uppercase tracking-tighter">
-                                                Chandelier Exit {strategyResult.price > parseFloat(strategyResult.chandelierStop || '0') ? '(Long)' : '(Short)'}
-                                            </p>
-                                            <span className="text-[8px] text-stone-300">3.0x ATR</span>
-                                        </div>
-                                        <p className={`text-2xl font-serif font-bold transition-transform group-hover:scale-105 origin-left ${strategyResult.price > parseFloat(strategyResult.chandelierStop || '0') ? 'text-orange-600' : 'text-blue-600'}`}>
-                                            ${(strategyResult.chandelierStop || '0')}
-                                        </p>
-                                    </div>
-                                    <div className="pt-4 mt-2 border-t border-stone-50 grid grid-cols-2 gap-4">
-                                        <div className="group">
-                                            <p className="text-[10px] text-stone-400 font-bold uppercase tracking-tighter">Regime Confidence</p>
-                                            <div className="flex items-center gap-2">
-                                                <p className="text-lg font-serif font-bold text-indigo-600">{Math.round(strategyResult.regimeConfidence * 100)}%</p>
-                                                <div className="h-1.5 w-12 bg-stone-100 rounded-full overflow-hidden">
-                                                    <div className="h-full bg-indigo-500 transition-all duration-500" style={{ width: `${strategyResult.regimeConfidence * 100}%` }}></div>
-                                                </div>
-                                            </div>
-                                        </div>
-                                        <div className="group text-right">
-                                            <p className="text-[10px] text-stone-400 font-bold uppercase tracking-tighter">Risk Heat</p>
-                                            <p className={`text-lg font-serif font-bold ${strategyResult.riskHeat === 'HIGH' ? 'text-rose-600' :
-                                                strategyResult.riskHeat === 'NORMAL' ? 'text-amber-600' : 'text-emerald-600'
-                                                }`}>
-                                                {strategyResult.riskHeat}
-                                            </p>
-                                        </div>
-                                    </div>
-                                    <div className="group pt-2">
-                                        <p className="text-[10px] text-stone-400 font-bold uppercase tracking-tighter">Position Size</p>
-                                        <p className="text-lg font-serif font-bold text-stone-800">{Math.round(strategyResult.positionSize * 100)}%</p>
-                                        <p className="text-[8px] text-stone-400">V5 Adaptive Scaling (1% Risk Cap)</p>
-                                    </div>
-                                </div>
-                            </div>
-                        )}
-
-                        <div className="bg-white p-6 rounded-lg border border-stone-200 shadow-sm">
-                            <h3 className="text-sm font-bold text-stone-400 uppercase tracking-widest border-b border-stone-50 pb-2">Algorithm Insight</h3>
-                            <div className="mt-4 p-3 bg-stone-50 rounded border border-stone-100 space-y-3">
-                                <div className="flex items-center gap-2">
-                                    <span className={`w-2 h-2 rounded-full ${strategyResult && (strategyResult.regime === 'BULL') ? 'bg-emerald-500 animate-pulse' : strategyResult?.regime === 'BEAR' ? 'bg-rose-500' : 'bg-amber-500'}`}></span>
-                                    <p className="text-[10px] font-bold text-stone-500 uppercase tracking-tight">
-                                        Market Regime: {strategyResult?.regime === 'BULL' ? 'Trending Bull' : strategyResult?.regime === 'BEAR' ? 'Trending Bear' : 'Sideways Ranging'}
-                                        ({Math.round((strategyResult?.regimeConfidence || 0) * 100)}% Conf)
-                                    </p>
-                                </div>
-                                <div className="flex items-center gap-2">
-                                    <div className={`w-1.5 h-1.5 rounded-full ${strategyResult && (strategyResult.regimeConfidence > 0.4) ? 'bg-indigo-500' : 'bg-stone-300'}`}></div>
-                                    <p className="text-[9px] text-stone-400 font-bold uppercase tracking-tight">Triple Screen EMA Alignment: {strategyResult && (strategyResult.regimeConfidence > 0.4) ? 'CONFIRMED' : 'WAITING'}</p>
-                                </div>
-                                <p className="text-xs text-stone-700 font-medium leading-relaxed italic">
-                                    {strategyResult?.signal === 'STRONG_BUY' && `🏛 V5 Alpha Long: Triple Screen confirmed. Scaling to ${Math.round(strategyResult.positionSize * 100)}% weight based on volatility.`}
-                                    {strategyResult?.signal === 'PYRAMID_BUY' && `🚀 V5 Pyramid: momentum acceleration. High confidence entry.`}
-                                    {strategyResult?.signal === 'STRONG_SELL' && `⚠ V5 Alpha Short: Macro breakdown. Scaling to ${Math.round(strategyResult.positionSize * 100)}% weight.`}
-                                    {strategyResult?.signal === 'PYRAMID_SELL' && `🔥 V5 Pyramid: Bearish momentum acceleration.`}
-                                    {strategyResult?.signal === 'EXIT_LONG' && "⇲ Institutional Profit Target or Chandelier Exit. Realizing V5 gains."}
-                                    {strategyResult?.signal === 'EXIT_SHORT' && "⇱ Institutional Profit Target or Chandelier Exit. Realizing V5 gains."}
-                                    {strategyResult?.signal === 'HOLD' && "⚡ Monitoring: V5 Smart Filters active. Waiting for high-probability alignment."}
-                                </p>
-                            </div>
-                        </div>
+                        <AlgorithmInsight strategyResult={strategyResult} />
                     </div>
                 </div>
 
@@ -296,81 +156,10 @@ export default function MarketDashboardPage() {
                     <HistoryTable symbol={symbol} history={stockHistory} />
                 </div>
 
-                <div className="bg-stone-900 text-stone-100 p-8 rounded-lg shadow-xl overflow-hidden relative">
-                    <div className="absolute top-0 right-0 p-4 opacity-10">
-                        <svg className="w-32 h-32" fill="currentColor" viewBox="0 0 24 24"><path d="M16 6l2.29 2.29-4.88 4.88-4-4L2 16.59 3.41 18l6-6 4 4 6.3-6.29L22 12V6z" /></svg>
-                    </div>
-                    <h3 className="text-2xl font-serif font-bold mb-6 flex items-center gap-2">
-                        Institutional Backtest Analysis
-                        <span className="text-[10px] bg-stone-700 px-2 py-0.5 rounded uppercase tracking-tighter text-stone-300">1 Year (ES=F)</span>
-                    </h3>
-
-                    {backtestLoading ? (
-                        <p className="text-stone-400 italic">Calculating institutional grade performance metrics...</p>
-                    ) : backtestResult ? (
-                        <div className="space-y-10">
-                            <div className="grid grid-cols-2 md:grid-cols-4 gap-8">
-                                <div className="space-y-1 group">
-                                    <p className="text-xs font-bold text-stone-500 uppercase tracking-widest">Net Profit Rate</p>
-                                    <p className="text-3xl font-serif font-bold text-emerald-400 group-hover:scale-110 transition-transform origin-left">{(backtestResult.netReturnAfterCosts || 0).toFixed(1)}%</p>
-                                    <p className="text-[10px] text-stone-500 italic">Bench: {(backtestResult.buyAndHoldReturn || 0).toFixed(1)}% (B&H)</p>
-                                </div>
-                                <div className="space-y-1 group">
-                                    <p className="text-xs font-bold text-stone-500 uppercase tracking-widest">Max Drawdown</p>
-                                    <p className="text-3xl font-serif font-bold text-rose-500 group-hover:scale-110 transition-transform origin-left">{(backtestResult.mdd || 0).toFixed(1)}%</p>
-                                    <p className="text-[10px] text-stone-500 italic">Worst-case equity drop</p>
-                                </div>
-                                <div className="space-y-1 group">
-                                    <p className="text-xs font-bold text-stone-500 uppercase tracking-widest">Win Rate (Net)</p>
-                                    <p className="text-3xl font-serif font-bold text-blue-400 group-hover:scale-110 transition-transform origin-left">{(backtestResult.winRate || 0).toFixed(1)}%</p>
-                                    <p className="text-[10px] text-stone-500 italic">Profitable trade freq</p>
-                                </div>
-                                <div className="space-y-1 group">
-                                    <p className="text-xs font-bold text-stone-500 uppercase tracking-widest">Strategy Alpha</p>
-                                    <p className={`text-3xl font-serif font-bold group-hover:scale-110 transition-transform origin-left ${backtestResult.alphaVsBenchmark >= 0 ? 'text-emerald-500' : 'text-rose-400'}`}>
-                                        {backtestResult.alphaVsBenchmark >= 0 ? '+' : ''}{(backtestResult.alphaVsBenchmark || 0).toFixed(1)}%
-                                    </p>
-                                    <p className="text-[10px] text-stone-500 italic">Vs. S&P 500 Benchmark</p>
-                                </div>
-                            </div>
-
-                            <div className="grid grid-cols-2 gap-8 border-y border-stone-800/50 py-8">
-                                <div className="space-y-1">
-                                    <p className="text-xs font-bold text-stone-500 uppercase tracking-widest">Profit Factor</p>
-                                    <p className={`text-4xl font-serif font-bold ${(backtestResult.profitFactor || 0) >= 1.5 ? 'text-emerald-400' : 'text-amber-400'}`}>
-                                        {(backtestResult.profitFactor || 0).toFixed(2)}
-                                    </p>
-                                    <p className="text-[10px] text-stone-500 italic leading-tight">Institutional target: &gt; 1.5</p>
-                                </div>
-                                <div className="space-y-1">
-                                    <p className="text-xs font-bold text-stone-500 uppercase tracking-widest">Avg Hold Time</p>
-                                    <p className="text-4xl font-serif font-bold text-stone-100">
-                                        {(backtestResult.averageHoldTime || 0).toFixed(1)} <span className="text-sm font-sans text-stone-500 uppercase">Days</span>
-                                    </p>
-                                    <p className="text-[10px] text-stone-500 italic leading-tight">Average duration per trade</p>
-                                </div>
-                            </div>
-
-                            <div className="bg-stone-800/50 p-6 rounded-lg border border-stone-700/50">
-                                <div className="flex items-start gap-4">
-                                    <div className="bg-amber-500/10 p-2 rounded text-amber-500">
-                                        <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.326.188 3 1.732 3z" /></svg>
-                                    </div>
-                                    <div className="space-y-1">
-                                        <p className="text-xs font-bold text-stone-300 uppercase tracking-widest leading-none">Friction & Reliability Analysis</p>
-                                        <p className="text-sm text-stone-400 italic leading-relaxed">
-                                            "Strategy V5 Analysis: Outperforming benchmark by <b>{(backtestResult.alphaVsBenchmark || 0).toFixed(1)}%</b> with
-                                            a Profit Factor of <b>{(backtestResult.profitFactor || 0).toFixed(2)}</b>.
-                                            Triple Screen EMA filtering has successfully identified <b>{backtestResult.totalTrades || 0}</b> high-confidence trade windows."
-                                        </p>
-                                    </div>
-                                </div>
-                            </div>
-                        </div>
-                    ) : (
-                        <p className="text-stone-500 italic">Unable to retrieve backtest data.</p>
-                    )}
-                </div>
+                <BacktestAnalysis
+                    backtestResult={backtestResult}
+                    backtestLoading={backtestLoading}
+                />
             </div>
 
             <footer className="bg-stone-900 text-stone-100 p-8 rounded-lg shadow-xl">
