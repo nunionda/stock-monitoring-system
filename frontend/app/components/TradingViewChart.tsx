@@ -19,13 +19,15 @@ export default function TradingViewChart({ symbol }: TradingViewChartProps) {
     // yfinance: 005930.KS -> TradingView: KRX:005930
     // yfinance: AAPL -> TradingView: NASDAQ:AAPL (or just AAPL)
     const getTVSymbol = (s: string) => {
+        if (s === 'ES=F') {
+            return 'CME:ES1!';
+        }
         if (s.endsWith('.KS')) {
             return `KRX:${s.replace('.KS', '')}`;
         }
         if (s.endsWith('.KQ')) {
             return `KOSDAQ:${s.replace('.KQ', '')}`;
         }
-        // For US stocks, we might need to check if it's NASDAQ or NYSE, but TV often handles it or we can default.
         return s;
     };
 
@@ -71,7 +73,7 @@ export default function TradingViewChart({ symbol }: TradingViewChartProps) {
     }, [tvSymbol]);
 
     return (
-        <div className='tradingview-widget-container' style={{ height: "400px", width: "100%" }}>
+        <div className='tradingview-widget-container' style={{ height: "500px", width: "100%" }}>
             <div id={`tv_chart_${tvSymbol.replace(':', '_')}`} ref={container} style={{ height: "100%", width: "100%" }} />
         </div>
     );

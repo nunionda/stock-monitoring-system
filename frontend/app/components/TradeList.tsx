@@ -1,15 +1,17 @@
 'use client';
 
 import { components } from '../../types/api';
+import { formatCurrency } from '../utils/formatters';
 
 type Trade = components['schemas']['Trade'];
 
 interface TradeListProps {
     trades: Trade[];
     onDelete: (id: number) => void;
+    market: 'US' | 'KR';
 }
 
-export default function TradeList({ trades, onDelete }: TradeListProps) {
+export default function TradeList({ trades, onDelete, market }: TradeListProps) {
     if (trades.length === 0) {
         return (
             <div className="text-center py-10 bg-stone-50 rounded-lg border border-dashed border-stone-300">
@@ -48,13 +50,13 @@ export default function TradeList({ trades, onDelete }: TradeListProps) {
                                 </span>
                             </td>
                             <td className="px-6 py-4 whitespace-nowrap text-sm text-stone-600">
-                                ${trade.price.toFixed(2)}
+                                {formatCurrency(trade.price, market)}
                             </td>
                             <td className="px-6 py-4 whitespace-nowrap text-sm text-stone-600">
                                 {trade.quantity}
                             </td>
                             <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-stone-900">
-                                ${(trade.price * trade.quantity).toFixed(2)}
+                                {formatCurrency(trade.price * trade.quantity, market)}
                             </td>
                             <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
                                 <button

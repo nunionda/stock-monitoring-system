@@ -4,14 +4,17 @@ import { API_BASE_URL } from '../utils/config';
 
 type Trade = components['schemas']['Trade'];
 
-export const useTradeData = () => {
+export const useTradeData = (market?: string) => {
     const [trades, setTrades] = useState<Trade[]>([]);
     const [loading, setLoading] = useState(true);
     const [currentPrices, setCurrentPrices] = useState<Record<string, number>>({});
 
     const fetchTrades = useCallback(async () => {
         try {
-            const res = await fetch(`${API_BASE_URL}/trades/`);
+            const url = market
+                ? `${API_BASE_URL}/trades/?market=${market}`
+                : `${API_BASE_URL}/trades/`;
+            const res = await fetch(url);
             if (res.ok) {
                 const data = await res.json();
                 setTrades(data);
@@ -21,7 +24,7 @@ export const useTradeData = () => {
         } finally {
             setLoading(false);
         }
-    }, []);
+    }, [market]);
 
     const updateMarketPrices = useCallback(async (symbols: string[]) => {
         if (symbols.length === 0) return;

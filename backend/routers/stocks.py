@@ -109,6 +109,28 @@ async def record_stock_stats(stat: StockDailyStat, session: Session = Depends(ge
         session.rollback()
         raise HTTPException(status_code=500, detail=str(e))
 
+@router.get("/candles/{symbol}")
+async def get_stock_candles(symbol: str, period: str = "60d", interval: str = "1d"):
+    try:
+        ticker = yf.Ticker(symbol)
+        hist = ticker.history(period=period, interval=interval)
+        if hist.empty:
+            raise HTTPException(status_code=404, detail="No candle data found")
+        
+        candles = []
+        for date, row in hist.iterrows():
+            candles.append({
+                "date": date.isoformat(),
+                "open": round(float(row['Open']), 2),
+                "high": round(float(row['High']), 2),
+                "low": round(float(row['Low']), 2),
+                "close": round(float(row['Close']), 2),
+                "volume": int(row['Volume'])
+            })
+        return candles
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
 @router.get("/history/{symbol}", response_model=List[StockDailyStat])
 async def get_stock_history(symbol: str, session: Session = Depends(get_session)):
     stats = session.exec(

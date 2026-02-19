@@ -16,6 +16,7 @@ class Trade(SQLModel, table=True):
     type: str  # Buy or Sell
     price: float
     quantity: int
+    market: str = Field(default="US", index=True) # "US" or "KR"
     trade_date: datetime = Field(default_factory=datetime.utcnow)
     notes: Optional[str] = None
     created_at: datetime = Field(default_factory=datetime.utcnow)

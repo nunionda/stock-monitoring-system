@@ -1,5 +1,6 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
 import { API_BASE_URL, WS_BASE_URL } from '../utils/config';
+import { Candle } from '../utils/strategy';
 
 export interface StockStats {
     symbol: string;
@@ -16,6 +17,7 @@ export interface StockStats {
 export const useMarketData = (fixedSymbols: string[], customSymbols: string[]) => {
     const [stocks, setStocks] = useState<Record<string, StockStats | null>>({});
     const [history, setHistory] = useState<Record<string, any[]>>({});
+    const [candles, setCandles] = useState<Record<string, Candle[]>>({});
     const [loading, setLoading] = useState(true);
     const ws = useRef<WebSocket | null>(null);
 
@@ -47,14 +49,29 @@ export const useMarketData = (fixedSymbols: string[], customSymbols: string[]) =
         }
     }, []);
 
+    const fetchCandles = useCallback(async (symbol: string) => {
+        try {
+            const res = await fetch(`${API_BASE_URL}/stocks/candles/${symbol}`);
+            if (res.ok) {
+                const data = await res.json();
+                setCandles(prev => ({ ...prev, [symbol]: data }));
+            }
+        } catch (err) {
+            console.error(`Failed to fetch candles for ${symbol}:`, err);
+        }
+    }, []);
+
     const fetchAllData = useCallback(async () => {
         const allSymbols = [...fixedSymbols, ...customSymbols];
         await fetchStats(allSymbols);
         setLoading(false);
         for (const symbol of allSymbols) {
-            if (symbol) fetchHistory(symbol);
+            if (symbol) {
+                fetchHistory(symbol);
+                fetchCandles(symbol);
+            }
         }
-    }, [fixedSymbols, customSymbols, fetchStats, fetchHistory]);
+    }, [fixedSymbols, customSymbols, fetchStats, fetchHistory, fetchCandles]);
 
     // Initial Fetch & Polling Fallback
     useEffect(() => {
@@ -120,5 +137,5 @@ export const useMarketData = (fixedSymbols: string[], customSymbols: string[]) =
         return false;
     };
 
-    return { stocks, history, loading, recordStat, refreshHistory: fetchHistory };
+    return { stocks, history, candles, loading, recordStat, refreshHistory: fetchHistory };
 };

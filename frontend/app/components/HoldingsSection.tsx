@@ -1,11 +1,13 @@
 import React from 'react';
+import { formatCurrency } from '../utils/formatters';
 
 interface HoldingsSectionProps {
     symbolMap: Record<string, { quantity: number; totalCost: number; realizedPL: number }>;
     currentPrices: Record<string, number>;
+    market: 'US' | 'KR';
 }
 
-export default function HoldingsSection({ symbolMap, currentPrices }: HoldingsSectionProps) {
+export default function HoldingsSection({ symbolMap, currentPrices, market }: HoldingsSectionProps) {
     const activeHoldings = Object.entries(symbolMap).filter(([_, s]) => s.quantity > 0);
 
     return (
@@ -21,10 +23,10 @@ export default function HoldingsSection({ symbolMap, currentPrices }: HoldingsSe
                             <div key={symbol} className="flex justify-between items-center border-b border-stone-100 pb-2">
                                 <div>
                                     <p className="font-bold text-stone-900">{symbol}</p>
-                                    <p className="text-xs text-stone-500">{s.quantity} Shares @ ${avgCost.toFixed(2)}</p>
+                                    <p className="text-xs text-stone-500">{s.quantity} Shares @ {formatCurrency(avgCost, market)}</p>
                                 </div>
                                 <div className="text-right">
-                                    <p className="font-medium text-stone-900">${(s.quantity * price).toLocaleString()}</p>
+                                    <p className="font-medium text-stone-900">{formatCurrency(s.quantity * price, market)}</p>
                                     <p className={`text-xs ${itemROI >= 0 ? 'text-green-600' : 'text-red-600'}`}>
                                         {itemROI >= 0 ? '+' : ''}{itemROI.toFixed(1)}%
                                     </p>

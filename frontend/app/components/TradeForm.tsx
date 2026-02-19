@@ -9,9 +9,10 @@ type Trade = components['schemas']['Trade'];
 
 interface TradeFormProps {
     onTradeAdded: (trade: Trade) => void;
+    market: 'US' | 'KR';
 }
 
-export default function TradeForm({ onTradeAdded }: TradeFormProps) {
+export default function TradeForm({ onTradeAdded, market }: TradeFormProps) {
     const [stockName, setStockName] = useState('');
     const [type, setType] = useState('Buy');
     const [price, setPrice] = useState('');
@@ -131,11 +132,11 @@ export default function TradeForm({ onTradeAdded }: TradeFormProps) {
                     </div>
                     <input
                         type="number"
-                        step="0.01"
+                        step={market === 'KR' ? '1' : '0.01'}
                         value={price}
                         onChange={(e) => setPrice(e.target.value)}
                         required
-                        placeholder="0.00"
+                        placeholder={market === 'KR' ? '0' : '0.00'}
                         className="p-2 border border-stone-300 rounded focus:ring-2 focus:ring-stone-400 outline-none transition-all"
                     />
                 </div>

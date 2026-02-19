@@ -33,7 +33,8 @@ export default function RootLayout({
             <div className="text-xl font-serif font-bold tracking-tight">Personal Suite</div>
             <div className="flex space-x-6 font-medium text-stone-600">
               <Link href="/diary" className="hover:text-stone-900 transition-colors">Diary</Link>
-              <Link href="/trades" className="hover:text-stone-900 transition-colors">Trades</Link>
+              <Link href="/trades/us" className="hover:text-stone-900 transition-colors">US Trades</Link>
+              <Link href="/trades/kr" className="hover:text-stone-900 transition-colors">KR Trades</Link>
               <Link href="/market" className="hover:text-stone-900 transition-colors">Market</Link>
             </div>
           </div>

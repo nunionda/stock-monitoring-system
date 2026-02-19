@@ -1,6 +1,6 @@
 from fastapi import APIRouter, Depends, HTTPException
 from sqlmodel import Session, select
-from typing import List
+from typing import List, Optional
 from backend.database import get_session
 from backend.models import Trade
 
@@ -8,14 +8,24 @@ router = APIRouter(prefix="/trades", tags=["trades"])
 
 @router.post("/", response_model=Trade)
 def create_trade(trade: Trade, session: Session = Depends(get_session)):
+    # Auto-detect market if not specified
+    if not trade.market:
+        if trade.stock_name.endswith('.KS') or trade.stock_name.endswith('.KQ'):
+            trade.market = "KR"
+        else:
+            trade.market = "US"
+    
     session.add(trade)
     session.commit()
     session.refresh(trade)
     return trade
 
 @router.get("/", response_model=List[Trade])
-def read_trades(session: Session = Depends(get_session)):
-    trades = session.exec(select(Trade)).all()
+def read_trades(market: Optional[str] = None, session: Session = Depends(get_session)):
+    query = select(Trade)
+    if market:
+        query = query.where(Trade.market == market)
+    trades = session.exec(query).all()
     return trades
 
 @router.get("/{trade_id}", response_model=Trade)
