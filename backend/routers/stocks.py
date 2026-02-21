@@ -3,7 +3,8 @@ from sqlmodel import Session, select
 from typing import List
 import yfinance as yf
 import pandas as pd
-from datetime import datetime
+import numpy as np
+from datetime import datetime, timedelta
 from backend.database import get_session
 from backend.models import StockDailyStat
 
@@ -139,3 +140,66 @@ async def get_stock_history(symbol: str, session: Session = Depends(get_session)
         .order_by(StockDailyStat.date.asc())
     ).all()
     return stats
+
+@router.get("/simulation/1m/{symbol}")
+async def get_simulated_1m_candles(symbol: str):
+    try:
+        # Fetch 1 year of 1-hour data as the baseline macro trend
+        ticker = yf.Ticker(symbol)
+        hist = ticker.history(period="1y", interval="1h")
+        if hist.empty:
+            raise HTTPException(status_code=404, detail="No base data found for simulation")
+        
+        simulated_candles = []
+        
+        # Extrapolate 60 1-minute candles for each 1-hour candle
+        for date, row in hist.iterrows():
+            hour_open = float(row['Open'])
+            hour_high = float(row['High'])
+            hour_low = float(row['Low'])
+            hour_close = float(row['Close'])
+            hour_vol = int(row['Volume'])
+            
+            # Simple linear interpolation with random walk bounded by H/L
+            # This is a basic simulation for testing purposes
+            steps = 60
+            base_vol = hour_vol // steps
+            
+            # Generate 60 steps traversing from Open to Close
+            price_path = np.linspace(hour_open, hour_close, steps)
+            
+            # Add synthetic noise within the bounds
+            noise_amplitude = (hour_high - hour_low) * 0.2
+            noise = np.random.normal(0, noise_amplitude, steps)
+            
+            # Ensure start and end perfectly match the hourly candle
+            noisy_path = price_path + noise
+            noisy_path[0] = hour_open
+            noisy_path[-1] = hour_close
+            
+            # Clamp to High/Low
+            noisy_path = np.clip(noisy_path, hour_low, hour_high)
+            
+            for i in range(steps):
+                current_time = date + timedelta(minutes=i)
+                
+                # Derive synthetic OHLC for the minute
+                m_open = noisy_path[i] if i == 0 else m_close # type: ignore
+                m_close = noisy_path[i]
+                
+                # Add slight wick noise
+                m_high = min(hour_high, max(m_open, m_close) + abs(np.random.normal(0, noise_amplitude * 0.5)))
+                m_low = max(hour_low, min(m_open, m_close) - abs(np.random.normal(0, noise_amplitude * 0.5)))
+                
+                simulated_candles.append({
+                    "date": current_time.isoformat(),
+                    "open": round(float(m_open), 2),
+                    "high": round(float(m_high), 2),
+                    "low": round(float(m_low), 2),
+                    "close": round(float(m_close), 2),
+                    "volume": base_vol + int(abs(np.random.normal(0, base_vol * 0.5)))
+                })
+                
+        return simulated_candles
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Simulation failed: {str(e)}")

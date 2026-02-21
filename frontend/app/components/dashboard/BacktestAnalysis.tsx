@@ -6,7 +6,7 @@ interface BacktestAnalysisProps {
     backtestLoading: boolean;
 }
 
-export const BacktestAnalysis: React.FC<BacktestAnalysisProps> = ({ backtestResult, backtestLoading }) => {
+export const BacktestAnalysis: React.FC<BacktestAnalysisProps> = React.memo(({ backtestResult, backtestLoading }) => {
     return (
         <div className="bg-stone-900 text-stone-100 p-8 rounded-lg shadow-xl overflow-hidden relative">
             <div className="absolute top-0 right-0 p-4 opacity-10">
@@ -23,9 +23,11 @@ export const BacktestAnalysis: React.FC<BacktestAnalysisProps> = ({ backtestResu
                 <div className="space-y-10">
                     <div className="grid grid-cols-2 md:grid-cols-4 gap-8">
                         <div className="space-y-1 group">
-                            <p className="text-xs font-bold text-stone-500 uppercase tracking-widest">Net Profit Rate</p>
-                            <p className="text-3xl font-serif font-bold text-emerald-400 group-hover:scale-110 transition-transform origin-left">{(backtestResult.netReturnAfterCosts || 0).toFixed(1)}%</p>
-                            <p className="text-[10px] text-stone-500 italic">Bench: {(backtestResult.buyAndHoldReturn || 0).toFixed(1)}% (B&H)</p>
+                            <p className="text-xs font-bold text-stone-500 uppercase tracking-widest">Net Profit ($)</p>
+                            <p className={`text-3xl font-serif font-bold group-hover:scale-110 transition-transform origin-left ${backtestResult.netProfitAmount >= 0 ? 'text-emerald-400' : 'text-rose-400'}`}>
+                                ${Math.round(backtestResult.netProfitAmount).toLocaleString()}
+                            </p>
+                            <p className="text-[10px] text-stone-500 italic">Net ROC: {(backtestResult.netReturnAfterCosts || 0).toFixed(1)}%</p>
                         </div>
                         <div className="space-y-1 group">
                             <p className="text-xs font-bold text-stone-500 uppercase tracking-widest">Max Drawdown</p>
@@ -84,4 +86,4 @@ export const BacktestAnalysis: React.FC<BacktestAnalysisProps> = ({ backtestResu
             )}
         </div>
     );
-};
+});

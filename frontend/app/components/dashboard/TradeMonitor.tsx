@@ -8,12 +8,13 @@ interface TradeMonitorProps {
     strategyResult: any; // TradingSignal from strategy.ts
 }
 
-export const TradeMonitor: React.FC<TradeMonitorProps> = ({ symbol, data, backtestResult, strategyResult }) => {
-    // Hardcoded simulation values from original implementation
-    const manualEntryPrice = 6872.50;
-    const manualStopLoss = 6885.50;
-    const manualTakeProfit = 6840.50;
-    const manualBreakeven = 6860.00;
+// Hardcoded simulation values from original implementation
+const manualEntryPrice = 6872.50;
+const manualStopLoss = 6885.50;
+const manualTakeProfit = 6840.50;
+const manualBreakeven = 6860.00;
+
+export const TradeMonitor: React.FC<TradeMonitorProps> = React.memo(({ symbol, data, backtestResult, strategyResult }) => {
 
     return (
         <div className="space-y-8">
@@ -127,4 +128,4 @@ export const TradeMonitor: React.FC<TradeMonitorProps> = ({ symbol, data, backte
             )}
         </div>
     );
-};
+});

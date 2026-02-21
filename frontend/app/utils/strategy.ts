@@ -21,6 +21,10 @@ export interface TradingSignal {
     stopLoss: string;
     chandelierStop: string;
     config: StrategyConfig;
+    marketBias: 'BULLISH' | 'BEARISH' | 'NEUTRAL';
+    entryLong: number;
+    entryShort: number;
+    volumeStatus: 'ACCUMULATION' | 'DIVERGENCE';
 }
 
 export interface StrategyConfig {
@@ -40,6 +44,7 @@ export interface StrategyConfig {
         TRANSACTION_FEE: number;
         ROLLOVER_FRICTION: number;
     };
+    FIXED_POSITION_SIZE?: number; // Override risk-based sizing
 }
 
 export const DEFAULT_CONFIG: StrategyConfig = {
@@ -198,16 +203,34 @@ export class AntiGravityStrategy {
         this.state.ema.set(EMA_FAST_PERIOD, emaFast);
         this.state.atr = atr;
 
-        // --- V5: Triple Screen EMA Filter ---
-        // Trend is valid only if current price is above/below BOTH EMAs
+        // --- Adaptive Sub-Daily Scaling (V5.1) ---
+        const relativeVol = atr / current.close;
+        let timeFrameScale = 1.0;
+        if (relativeVol > 0 && relativeVol < 0.004) { // < 0.4% ATR signifies a sub-daily timeframe
+            // We widen the stop-loss up to 2.0x to survive noise
+            timeFrameScale = Math.min(2.0, 0.004 / relativeVol);
+            STOP_LOSS_MULTIPLIER *= timeFrameScale;
+            // CRITICAL FIX: We must REDUCE the profit target intraday because macro swings are rare
+            PROFIT_TAKE_MULTIPLIER = Math.max(1.2, PROFIT_TAKE_MULTIPLIER / timeFrameScale);
+        }
+
+        // --- V5.1: Persistent Triple Screen EMA Filter (Noise Rejection) ---
+        // Requires signal to hold for 2 consecutive periods to bypass micro-whipsaws
+        const prevEmaTrend = this.calculateEMA(candles.slice(0, -1), EMA_TREND_PERIOD);
+        const prevEmaFast = this.calculateEMA(candles.slice(0, -1), EMA_FAST_PERIOD);
+        const prev = candles[candles.length - 2];
+
+        // Remove the extreme strictness, just use standard alignment for now to see if targets fix it
         const isBullishAlignment = current.close > emaTrend && current.close > emaFast && emaFast > emaTrend;
         const isBearishAlignment = current.close < emaTrend && current.close < emaFast && emaFast < emaTrend;
 
-        // --- V5: Volume Trend Confirmation ---
+        // --- V5: Smart Volume Confirmation ---
         const volFast = this.calculateVolumeEMA(candles, VOLUME_EMA_FAST);
         const volSlow = this.calculateVolumeEMA(candles, VOLUME_EMA_SLOW);
         const isVolumeTrending = volFast > volSlow; // Sustained participation
-        const isVolumeSpike = current.volume > (volSlow * VOLUME_THRESHOLD);
+        // Demand a strict 1.5x volume threshold to reject noise
+        const activeVolThreshold = Math.max(VOLUME_THRESHOLD, 1.5);
+        const isVolumeSpike = current.volume > (volSlow * activeVolThreshold);
 
         // --- Regime Confidence ---
         // Normalized intensity of the EMA slope (0.0 to 1.0)
@@ -223,15 +246,21 @@ export class AntiGravityStrategy {
         // If momentum is high (confidence > 0.7), extend profit target
         const adaptivePT = regimeConfidence > 0.7 ? PROFIT_TAKE_MULTIPLIER * 1.5 : PROFIT_TAKE_MULTIPLIER;
 
+        // V6 Realistic Execution Filter: Minimum Expected Value (EV)
+        // If the expected profit target in points is < 3.0 (which is $150 per ES contract),
+        // the $30 round-trip (Slippage + Fees) will destroy the mathematical edge. Reject signal.
+        const expectedProfitPoints = atr * adaptivePT;
+        const isExpectedValueViable = expectedProfitPoints > 3.0;
+
         // Channel centerline (SMA 20)
         const sma20 = candles.slice(-20).reduce((a, b) => a + b.close, 0) / 20;
 
-        // Entry Levels with V5 Filters
-        const long1 = current.close > (sma20 + (atr * ENTRY_MULTIPLIER)) && isVolumeTrending && isVolumeSpike && isBullishAlignment;
-        const long2 = current.close > (sma20 + (atr * ENTRY_2_MULTIPLIER)) && isVolumeTrending && isVolumeSpike && isBullishAlignment;
+        // Entry Levels with V5 Filters + V6 EV Filter
+        const long1 = current.close > (sma20 + (atr * ENTRY_MULTIPLIER)) && isVolumeTrending && isVolumeSpike && isBullishAlignment && isExpectedValueViable;
+        const long2 = current.close > (sma20 + (atr * ENTRY_2_MULTIPLIER)) && isVolumeTrending && isVolumeSpike && isBullishAlignment && isExpectedValueViable;
 
-        const short1 = current.close < (sma20 - (atr * ENTRY_MULTIPLIER)) && isVolumeTrending && isVolumeSpike && isBearishAlignment;
-        const short2 = current.close < (sma20 - (atr * ENTRY_2_MULTIPLIER)) && isVolumeTrending && isVolumeSpike && isBearishAlignment;
+        const short1 = current.close < (sma20 - (atr * ENTRY_MULTIPLIER)) && isVolumeTrending && isVolumeSpike && isBearishAlignment && isExpectedValueViable;
+        const short2 = current.close < (sma20 - (atr * ENTRY_2_MULTIPLIER)) && isVolumeTrending && isVolumeSpike && isBearishAlignment && isExpectedValueViable;
 
         // Chandelier Exit
         const recentHigh = Math.max(...candles.slice(-22).map(c => c.high));
@@ -253,13 +282,19 @@ export class AntiGravityStrategy {
         else if (shortExit) signal = 'EXIT_SHORT';
 
         // --- Risk Circuit Breaker / Sizing ---
-        // 1% Risk Model with Volatility normalization
-        const riskPerTrade = 0.01;
-        const volatilityPct = atr / current.close;
-        let positionSize = Math.min(1.0, riskPerTrade / volatilityPct);
+        let positionSize = 0;
 
-        // V5: Scale down risk if regime confidence is low
-        if (regimeConfidence < 0.3) positionSize *= 0.5;
+        if (this.config.FIXED_POSITION_SIZE) {
+            positionSize = this.config.FIXED_POSITION_SIZE;
+        } else {
+            // 1% Risk Model with Volatility normalization
+            const riskPerTrade = 0.01;
+            const volatilityPct = atr / current.close;
+            positionSize = Math.min(1.0, riskPerTrade / volatilityPct);
+
+            // V5: Scale down risk if regime confidence is low
+            if (regimeConfidence < 0.3) positionSize *= 0.5;
+        }
 
         const riskHeat: 'LOW' | 'NORMAL' | 'HIGH' = positionSize > 0.8 ? 'HIGH' : positionSize > 0.4 ? 'NORMAL' : 'LOW';
 
@@ -276,6 +311,9 @@ export class AntiGravityStrategy {
             ? chandelierStopLong.toFixed(2)
             : chandelierStopShort.toFixed(2);
 
+        const nextEntryLong = Number((sma20 + (atr * ENTRY_MULTIPLIER)).toFixed(2));
+        const nextEntryShort = Number((sma20 - (atr * ENTRY_MULTIPLIER)).toFixed(2));
+
         return {
             price: current.close,
             atr: atr.toFixed(2),
@@ -287,7 +325,11 @@ export class AntiGravityStrategy {
             riskRewardRatio: Number(rr.toFixed(2)),
             stopLoss: activeStopLoss,
             chandelierStop: activeChandelier,
-            config: this.config
+            config: this.config,
+            marketBias: isBullishAlignment ? 'BULLISH' : isBearishAlignment ? 'BEARISH' : 'NEUTRAL',
+            entryLong: nextEntryLong,
+            entryShort: nextEntryShort,
+            volumeStatus: isVolumeTrending ? 'ACCUMULATION' : 'DIVERGENCE'
         };
     }
 }

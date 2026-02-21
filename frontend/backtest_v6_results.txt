@@ -1,0 +1,13 @@
+Fetching simulated data...
+Fetched 342360 records
+Running fast V6 backtest on 30000 1-min candles...
+
+===== V6 MICRO-VWAP (1-MIN ES=F MONTHLY SIMULATION) =====
+Total Trades Executed: 22
+Win Rate Strategy: 59.09%
+Institutional Profit Factor: 0.89
+Gross Premium Capture: $172.29
+Max Expected Drawdown: 1.81%
+Avg Holding Duration: 1020.68 mins
+Alpha Gen. vs Buy & Hold: 1.60%
+=========================================================

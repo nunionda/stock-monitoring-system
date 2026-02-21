@@ -7,8 +7,8 @@ interface HoldingsSectionProps {
     market: 'US' | 'KR';
 }
 
-export default function HoldingsSection({ symbolMap, currentPrices, market }: HoldingsSectionProps) {
-    const activeHoldings = Object.entries(symbolMap).filter(([_, s]) => s.quantity > 0);
+export default React.memo(function HoldingsSection({ symbolMap, currentPrices, market }: HoldingsSectionProps) {
+    const activeHoldings = React.useMemo(() => Object.entries(symbolMap).filter(([_, s]) => s.quantity > 0), [symbolMap]);
 
     return (
         <div className="bg-stone-50 p-6 rounded-lg border border-stone-200">
@@ -40,4 +40,4 @@ export default function HoldingsSection({ symbolMap, currentPrices, market }: Ho
             </div>
         </div>
     );
-}
+});

@@ -5,7 +5,7 @@ interface HistoryTableProps {
     history: any[];
 }
 
-export default function HistoryTable({ symbol, history }: HistoryTableProps) {
+export default React.memo(function HistoryTable({ symbol, history }: HistoryTableProps) {
     if (history.length === 0) return null;
 
     return (
@@ -22,7 +22,7 @@ export default function HistoryTable({ symbol, history }: HistoryTableProps) {
                         </tr>
                     </thead>
                     <tbody className="divide-y divide-stone-100">
-                        {[...history].reverse().slice(0, 5).map((h, i) => (
+                        {history.slice(-5).reverse().map((h, i) => (
                             <tr key={i} className="text-stone-600">
                                 <td className="py-2">{h.date ? new Date(h.date).toLocaleDateString() : 'N/A'}</td>
                                 <td className="py-2 font-medium">{symbol.endsWith('.KS') ? '₩' : '$'}{(h.price ?? 0).toLocaleString()}</td>
@@ -38,4 +38,4 @@ export default function HistoryTable({ symbol, history }: HistoryTableProps) {
             {history.length > 5 && <p className="text-[9px] text-stone-400 mt-2 italic">Showing last 5 entries</p>}
         </div>
     );
-}
+});

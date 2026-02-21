@@ -9,7 +9,7 @@ interface PortfolioStatsProps {
     market: 'US' | 'KR';
 }
 
-export default function PortfolioStats({ roi, netPL, realizedPL, unrealizedPL, market }: PortfolioStatsProps) {
+export default React.memo(function PortfolioStats({ roi, netPL, realizedPL, unrealizedPL, market }: PortfolioStatsProps) {
     return (
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
             <div className="bg-white p-4 rounded-lg border border-stone-200 shadow-sm">
@@ -38,4 +38,4 @@ export default function PortfolioStats({ roi, netPL, realizedPL, unrealizedPL, m
             </div>
         </div>
     );
-}
+});

@@ -6,7 +6,7 @@ interface WatchlistEditorProps {
     onSave: () => void;
 }
 
-export default function WatchlistEditor({ newSymbols, onSymbolChange, onSave }: WatchlistEditorProps) {
+export default React.memo(function WatchlistEditor({ newSymbols, onSymbolChange, onSave }: WatchlistEditorProps) {
     return (
         <div className="bg-stone-50 p-6 rounded-lg border border-dashed border-stone-300">
             <h3 className="text-sm font-bold text-stone-800 mb-4 uppercase tracking-tight">Custom Watchlist (2 Stocks)</h3>
@@ -31,4 +31,4 @@ export default function WatchlistEditor({ newSymbols, onSymbolChange, onSave }: 
             </div>
         </div>
     );
-}
+});

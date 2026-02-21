@@ -1,0 +1,13 @@
+Fetching simulated data...
+Fetched 342360 records
+Running fast V5 backtest on 30000 1-min candles...
+
+===== V5 ALPHA (1-MIN ES=F MONTHLY SIMULATION) =====
+Total Trades Executed: 68
+Win Rate Strategy: 39.71%
+Institutional Profit Factor: 0.29
+Gross Premium Capture: $-6,255.03
+Max Expected Drawdown: 6.28%
+Avg Holding Duration: 166.06 mins
+Alpha Gen. vs Buy & Hold: -4.86%
+====================================================

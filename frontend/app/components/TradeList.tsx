@@ -1,5 +1,6 @@
 'use client';
 
+import React from 'react';
 import { components } from '../../types/api';
 import { formatCurrency } from '../utils/formatters';
 
@@ -11,7 +12,7 @@ interface TradeListProps {
     market: 'US' | 'KR';
 }
 
-export default function TradeList({ trades, onDelete, market }: TradeListProps) {
+export default React.memo(function TradeList({ trades, onDelete, market }: TradeListProps) {
     if (trades.length === 0) {
         return (
             <div className="text-center py-10 bg-stone-50 rounded-lg border border-dashed border-stone-300">
@@ -72,4 +73,4 @@ export default function TradeList({ trades, onDelete, market }: TradeListProps) 
             </table>
         </div>
     );
-}
+});

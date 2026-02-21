@@ -23,6 +23,7 @@ export const useMarketData = (fixedSymbols: string[], customSymbols: string[]) =
     const ws = useRef<WebSocket | null>(null);
 
     const fetchStats = useCallback(async (symbols: string[]) => {
+        if (typeof window === 'undefined') return;
         const results: Record<string, StockStats | null> = {};
         let fetchError = null;
         for (const symbol of symbols) {
@@ -45,6 +46,7 @@ export const useMarketData = (fixedSymbols: string[], customSymbols: string[]) =
     }, []);
 
     const fetchHistory = useCallback(async (symbol: string) => {
+        if (typeof window === 'undefined') return;
         try {
             const res = await fetch(`${API_BASE_URL}/stocks/history/${symbol}`);
             if (res.ok) {
@@ -57,6 +59,7 @@ export const useMarketData = (fixedSymbols: string[], customSymbols: string[]) =
     }, []);
 
     const fetchCandles = useCallback(async (symbol: string) => {
+        if (typeof window === 'undefined') return;
         try {
             const res = await fetch(`${API_BASE_URL}/stocks/candles/${symbol}`);
             if (res.ok) {

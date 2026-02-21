@@ -5,7 +5,7 @@ interface AlgorithmInsightProps {
     strategyResult: TradingSignal | null;
 }
 
-export const AlgorithmInsight: React.FC<AlgorithmInsightProps> = ({ strategyResult }) => {
+export const AlgorithmInsight: React.FC<AlgorithmInsightProps> = React.memo(({ strategyResult }) => {
     return (
         <div className="bg-white p-6 rounded-lg border border-stone-200 shadow-sm">
             <h3 className="text-sm font-bold text-stone-400 uppercase tracking-widest border-b border-stone-50 pb-2">Algorithm Insight</h3>
@@ -22,9 +22,9 @@ export const AlgorithmInsight: React.FC<AlgorithmInsightProps> = ({ strategyResu
                     <p className="text-[9px] text-stone-400 font-bold uppercase tracking-tight">Triple Screen EMA Alignment: {strategyResult && (strategyResult.regimeConfidence > 0.4) ? 'CONFIRMED' : 'WAITING'}</p>
                 </div>
                 <p className="text-xs text-stone-700 font-medium leading-relaxed italic">
-                    {strategyResult?.signal === 'STRONG_BUY' && `🏛 V5 Alpha Long: Triple Screen confirmed. Scaling to ${Math.round(strategyResult.positionSize * 100)}% weight based on volatility.`}
+                    {strategyResult?.signal === 'STRONG_BUY' && `🏛 V5 Alpha Long: Triple Screen confirmed. ${strategyResult.config.FIXED_POSITION_SIZE ? `Entering ${strategyResult.positionSize} contract.` : `Scaling to ${Math.round(strategyResult.positionSize * 100)}% weight based on volatility.`}`}
                     {strategyResult?.signal === 'PYRAMID_BUY' && `🚀 V5 Pyramid: momentum acceleration. High confidence entry.`}
-                    {strategyResult?.signal === 'STRONG_SELL' && `⚠ V5 Alpha Short: Macro breakdown. Scaling to ${Math.round(strategyResult.positionSize * 100)}% weight.`}
+                    {strategyResult?.signal === 'STRONG_SELL' && `⚠ V5 Alpha Short: Macro breakdown. ${strategyResult.config.FIXED_POSITION_SIZE ? `Entering ${strategyResult.positionSize} contract.` : `Scaling to ${Math.round(strategyResult.positionSize * 100)}% weight.`}`}
                     {strategyResult?.signal === 'PYRAMID_SELL' && `🔥 V5 Pyramid: Bearish momentum acceleration.`}
                     {strategyResult?.signal === 'EXIT_LONG' && "⇲ Institutional Profit Target or Chandelier Exit. Realizing V5 gains."}
                     {strategyResult?.signal === 'EXIT_SHORT' && "⇱ Institutional Profit Target or Chandelier Exit. Realizing V5 gains."}
@@ -33,4 +33,4 @@ export const AlgorithmInsight: React.FC<AlgorithmInsightProps> = ({ strategyResu
             </div>
         </div>
     );
-};
+});

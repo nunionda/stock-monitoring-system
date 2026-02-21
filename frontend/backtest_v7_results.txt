@@ -1,0 +1,13 @@
+Fetching simulated data...
+Fetched 342360 records
+Running fast V7 Asymmetric backtest on 30000 1-min candles...
+
+===== V7 ASYMMETRIC VWAP (1-MIN ES=F MONTHLY SIMULATION) =====
+Total Trades Executed: 49
+Win Rate Strategy: 20.41%
+Institutional Profit Factor: 0.17
+Gross Premium Capture: $-5,030.24
+Max Expected Drawdown: 5.29%
+Avg Holding Duration: 8.37 mins
+Alpha Gen. vs Buy & Hold: -3.61%
+=========================================================

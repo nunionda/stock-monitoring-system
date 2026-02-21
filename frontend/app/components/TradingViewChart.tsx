@@ -12,8 +12,9 @@ declare global {
     }
 }
 
-export default function TradingViewChart({ symbol }: TradingViewChartProps) {
+export default React.memo(function TradingViewChart({ symbol }: TradingViewChartProps) {
     const container = useRef<HTMLDivElement>(null);
+    const widgetRef = useRef<any>(null);
 
     // Map yfinance symbol format to TradingView format
     // yfinance: 005930.KS -> TradingView: KRX:005930
@@ -39,7 +40,7 @@ export default function TradingViewChart({ symbol }: TradingViewChartProps) {
         script.async = true;
         script.onload = () => {
             if (container.current && window.TradingView) {
-                new window.TradingView.widget({
+                widgetRef.current = new window.TradingView.widget({
                     "autosize": true,
                     "symbol": tvSymbol,
                     "interval": "D",
@@ -65,10 +66,22 @@ export default function TradingViewChart({ symbol }: TradingViewChartProps) {
                 });
             }
         };
-        document.head.appendChild(script);
+
+        if (!document.querySelector('script[src="https://s3.tradingview.com/tv.js"]')) {
+            document.head.appendChild(script);
+        } else if (window.TradingView) {
+            script.onload?.(new Event('load'));
+        }
 
         return () => {
-            // Cleanup script if needed, though usually fine as it's a global library
+            if (widgetRef.current) {
+                try {
+                    widgetRef.current.remove();
+                    widgetRef.current = null;
+                } catch (e) {
+                    console.error("Error removing TradingView widget", e);
+                }
+            }
         };
     }, [tvSymbol]);
 
@@ -77,4 +90,4 @@ export default function TradingViewChart({ symbol }: TradingViewChartProps) {
             <div id={`tv_chart_${tvSymbol.replace(':', '_')}`} ref={container} style={{ height: "100%", width: "100%" }} />
         </div>
     );
-}
+});

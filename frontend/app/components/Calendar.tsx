@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import React, { useState } from 'react';
 import {
     format,
     addMonths,
@@ -21,7 +21,7 @@ interface CalendarProps {
     entryDates: Date[];
 }
 
-export default function Calendar({ selectedDate, onDateSelect, entryDates }: CalendarProps) {
+export default React.memo(function Calendar({ selectedDate, onDateSelect, entryDates }: CalendarProps) {
     const [currentMonth, setCurrentMonth] = useState(new Date());
 
     const nextMonth = () => setCurrentMonth(addMonths(currentMonth, 1));
@@ -37,9 +37,13 @@ export default function Calendar({ selectedDate, onDateSelect, entryDates }: Cal
         end: endDate,
     });
 
-    const hasEntry = (day: Date) => {
-        return entryDates.some((date) => isSameDay(date, day));
-    };
+    const entrySet = React.useMemo(() => {
+        return new Set(entryDates.map(d => format(d, 'yyyy-MM-dd')));
+    }, [entryDates]);
+
+    const hasEntry = React.useCallback((day: Date) => {
+        return entrySet.has(format(day, 'yyyy-MM-dd'));
+    }, [entrySet]);
 
     return (
         <div className="bg-white border border-stone-200 rounded-2xl p-6 shadow-sm">
@@ -106,4 +110,4 @@ export default function Calendar({ selectedDate, onDateSelect, entryDates }: Cal
             </div>
         </div>
     );
-}
+});

@@ -10,6 +10,7 @@ export const useTradeData = (market?: string) => {
     const [currentPrices, setCurrentPrices] = useState<Record<string, number>>({});
 
     const fetchTrades = useCallback(async () => {
+        if (typeof window === 'undefined') return; // Prevent SSR fetch crash
         try {
             const url = market
                 ? `${API_BASE_URL}/trades/?market=${market}`
@@ -27,7 +28,7 @@ export const useTradeData = (market?: string) => {
     }, [market]);
 
     const updateMarketPrices = useCallback(async (symbols: string[]) => {
-        if (symbols.length === 0) return;
+        if (symbols.length === 0 || typeof window === 'undefined') return;
         try {
             const res = await fetch(`${API_BASE_URL}/stocks/prices/`, {
                 method: 'POST',

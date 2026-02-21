@@ -11,6 +11,7 @@ export interface BacktestResult {
     averageHoldTime: number; // In days/candles
     buyAndHoldReturn: number;
     alphaVsBenchmark: number;
+    netProfitAmount: number; // Raw $ PnL
     activePosition: ActivePosition | null;
     trades: BacktestTrade[];
 }
@@ -38,9 +39,12 @@ export interface BacktestTrade {
 }
 
 export interface BacktestConfig {
-    SLIPPAGE: number;
-    TRANSACTION_FEE: number;
-    ROLLOVER_FRICTION: number;
+    SLIPPAGE_TICKS: number;    // E.g., 1 tick = 0.25 points in ES
+    TICK_VALUE: number;        // E.g., 1 tick = $12.50 in ES
+    TICK_SIZE: number;         // E.g., 0.25 in ES
+    TRANSACTION_FEE: number;   // E.g., $5.00 per round trip
+    INITIAL_MARGIN: number;    // E.g., $13500 for ES
+    FUTURES_MULTIPLIER: number; // E.g., 50 for ES
 }
 
 /**
@@ -50,7 +54,14 @@ export async function runBacktest(
     candles: Candle[],
     config: Partial<BacktestConfig> = {}
 ): Promise<BacktestResult> {
-    const { SLIPPAGE, TRANSACTION_FEE } = { ...DEFAULT_CONFIG.COSTS, ...config };
+    const {
+        SLIPPAGE_TICKS = 1,
+        TICK_VALUE = 12.50,
+        TICK_SIZE = 0.25,
+        TRANSACTION_FEE = 5.0,
+        INITIAL_MARGIN = 13500,
+        FUTURES_MULTIPLIER = 50
+    } = config;
 
     if (candles.length < 50) {
         return {
@@ -64,6 +75,7 @@ export async function runBacktest(
             averageHoldTime: 0,
             buyAndHoldReturn: 0,
             alphaVsBenchmark: 0,
+            netProfitAmount: 0,
             activePosition: null,
             trades: []
         };
@@ -114,15 +126,23 @@ export async function runBacktest(
                 if (isTargetHit) {
                     const exitPrice = profitTarget; // Assume exit at target
                     const partialWeight = currentPosition.weight * 0.5;
-                    const netProfit = currentPosition.type === 'LONG'
-                        ? (exitPrice * (1 - SLIPPAGE) - currentPosition.avgEntryPrice) * partialWeight
-                        : (currentPosition.avgEntryPrice - exitPrice * (1 + SLIPPAGE)) * partialWeight;
 
-                    const slippageImpact = Math.abs(exitPrice * SLIPPAGE) * partialWeight;
-                    totalCosts += slippageImpact + TRANSACTION_FEE;
+                    // Realistic Tick Slippage applied to point price
+                    const actualExitPrice = currentPosition.type === 'LONG'
+                        ? exitPrice - (SLIPPAGE_TICKS * TICK_SIZE)
+                        : exitPrice + (SLIPPAGE_TICKS * TICK_SIZE);
 
-                    const returnPercent = (netProfit / (currentPosition.avgEntryPrice * partialWeight)) * 100;
-                    netEquity *= (1 + returnPercent / 100);
+                    const pointDiff = currentPosition.type === 'LONG'
+                        ? (actualExitPrice - currentPosition.avgEntryPrice)
+                        : (currentPosition.avgEntryPrice - actualExitPrice);
+
+                    const netProfit = pointDiff * FUTURES_MULTIPLIER * partialWeight;
+
+                    const tradeCost = TRANSACTION_FEE;
+                    totalCosts += tradeCost;
+
+                    const returnPercent = (netProfit / initialEquity) * 100;
+                    netEquity += (netProfit - TRANSACTION_FEE);
 
                     trades.push({
                         type: currentPosition.type,
@@ -133,8 +153,8 @@ export async function runBacktest(
                         exitPrice: exitPrice,
                         exitIndex: i,
                         profit: netProfit,
-                        returnPercent: (netProfit / (currentPosition.avgEntryPrice * currentPosition.weight)) * 100,
-                        cost: slippageImpact + TRANSACTION_FEE
+                        returnPercent: returnPercent,
+                        cost: tradeCost
                     });
 
                     currentPosition.weight -= partialWeight;
@@ -162,20 +182,23 @@ export async function runBacktest(
 
             if (shouldExit) {
                 const exitPrice = currentCandle.close;
-                const exitPriceWithSlippage = currentPosition.type === 'LONG'
-                    ? exitPrice * (1 - SLIPPAGE)
-                    : exitPrice * (1 + SLIPPAGE);
 
-                const netProfit = currentPosition.type === 'LONG'
-                    ? (exitPriceWithSlippage - currentPosition.avgEntryPrice) * currentPosition.weight
-                    : (currentPosition.avgEntryPrice - exitPriceWithSlippage) * currentPosition.weight;
+                // Realistic Tick Slippage applied to point price
+                const actualExitPrice = currentPosition.type === 'LONG'
+                    ? exitPrice - (SLIPPAGE_TICKS * TICK_SIZE)
+                    : exitPrice + (SLIPPAGE_TICKS * TICK_SIZE);
 
-                const slippageImpact = Math.abs(exitPrice * SLIPPAGE) * currentPosition.weight;
-                const tradeCost = slippageImpact + TRANSACTION_FEE;
+                const pointDiff = currentPosition.type === 'LONG'
+                    ? (actualExitPrice - currentPosition.avgEntryPrice)
+                    : (currentPosition.avgEntryPrice - actualExitPrice);
+
+                const netProfit = pointDiff * FUTURES_MULTIPLIER * currentPosition.weight;
+
+                const tradeCost = TRANSACTION_FEE;
                 totalCosts += tradeCost;
 
-                const netReturnPercent = (netProfit / (currentPosition.avgEntryPrice * currentPosition.weight)) * 100;
-                netEquity *= (1 + netReturnPercent / 100);
+                const netReturnPercent = (netProfit / initialEquity) * 100;
+                netEquity += (netProfit - TRANSACTION_FEE);
 
                 if (netEquity > peakEquity) peakEquity = netEquity;
                 const dd = (peakEquity - netEquity) / peakEquity;
@@ -197,12 +220,26 @@ export async function runBacktest(
             }
         }
 
-        // 3. Entry Logic
+        // 3. Entry Logic & Margin Validation
         if (!currentPosition) {
             if (result.signal === 'STRONG_BUY' || result.signal === 'STRONG_SELL') {
                 const isLong = result.signal === 'STRONG_BUY';
-                const weight = result.positionSize * 0.5; // Initial stage
-                const entryPrice = isLong ? currentCandle.close * (1 + SLIPPAGE) : currentCandle.close * (1 - SLIPPAGE);
+
+                // Strict Initial Margin Check
+                // E.g., User wants to trade 1 contract (weight = 1), does netEquity cover INITIAL_MARGIN?
+                // For this simulation, we assume base 1 contract execution, but cap it to 0 if not enough margin
+                let contractSize = 1;
+                if (netEquity < (INITIAL_MARGIN * contractSize)) {
+                    continue; // Engine denies entry due to insufficient funds (Margin Call protection)
+                }
+
+                // Initial position assigns 1 contract
+                const weight = contractSize;
+
+                // Realistic Entry Slippage
+                const entryPrice = isLong
+                    ? currentCandle.close + (SLIPPAGE_TICKS * TICK_SIZE)
+                    : currentCandle.close - (SLIPPAGE_TICKS * TICK_SIZE);
 
                 currentPosition = {
                     type: isLong ? 'LONG' : 'SHORT',
@@ -213,19 +250,23 @@ export async function runBacktest(
                     weight: weight,
                     partialExitTaken: false
                 };
-                totalCosts += (entryPrice * SLIPPAGE * weight) + TRANSACTION_FEE;
+                totalCosts += TRANSACTION_FEE;
             }
         } else {
             // Pyramiding stage
             if ((result.signal === 'PYRAMID_BUY' && currentPosition.type === 'LONG') ||
                 (result.signal === 'PYRAMID_SELL' && currentPosition.type === 'SHORT')) {
-                if (currentPosition.weight < result.positionSize) {
-                    const addWeight = Math.min(0.5, result.positionSize - currentPosition.weight);
-                    const entryPrice = currentPosition.type === 'LONG' ? currentCandle.close * (1 + SLIPPAGE) : currentCandle.close * (1 - SLIPPAGE);
+                // If we want to pyramid another contract, check margin
+                if (netEquity >= (INITIAL_MARGIN * (currentPosition.weight + 1))) {
+                    const addWeight = 1;
+                    const entryPrice = currentPosition.type === 'LONG'
+                        ? currentCandle.close + (SLIPPAGE_TICKS * TICK_SIZE)
+                        : currentCandle.close - (SLIPPAGE_TICKS * TICK_SIZE);
+
                     const newTotalWeight = currentPosition.weight + addWeight;
                     currentPosition.avgEntryPrice = (currentPosition.avgEntryPrice * currentPosition.weight + entryPrice * addWeight) / newTotalWeight;
                     currentPosition.weight = newTotalWeight;
-                    totalCosts += (entryPrice * SLIPPAGE * addWeight) + TRANSACTION_FEE;
+                    totalCosts += TRANSACTION_FEE;
                 }
             }
         }
@@ -257,10 +298,18 @@ export async function runBacktest(
     let activePosition: ActivePosition | null = null;
     if (currentPosition) {
         const lastCandle = candles[candles.length - 1];
-        const floatingProfit = currentPosition.type === 'LONG'
-            ? (lastCandle.close - currentPosition.avgEntryPrice) * currentPosition.weight
-            : (currentPosition.avgEntryPrice - lastCandle.close) * currentPosition.weight;
-        const floatingReturn = (floatingProfit / (currentPosition.avgEntryPrice * currentPosition.weight)) * 100;
+
+        const pointDiff = currentPosition.type === 'LONG'
+            ? (lastCandle.close - currentPosition.avgEntryPrice)
+            : (currentPosition.avgEntryPrice - lastCandle.close);
+
+        const floatingProfit = FUTURES_MULTIPLIER
+            ? pointDiff * FUTURES_MULTIPLIER * currentPosition.weight
+            : pointDiff * currentPosition.weight;
+
+        const floatingReturn = FUTURES_MULTIPLIER
+            ? (floatingProfit / initialEquity) * 100
+            : (floatingProfit / (currentPosition.avgEntryPrice * currentPosition.weight)) * 100;
 
         activePosition = {
             type: currentPosition.type,
@@ -283,6 +332,7 @@ export async function runBacktest(
         averageHoldTime,
         buyAndHoldReturn,
         alphaVsBenchmark,
+        netProfitAmount: netEquity - initialEquity,
         activePosition,
         trades
     };

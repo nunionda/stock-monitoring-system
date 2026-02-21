@@ -5,7 +5,7 @@ interface RiskMetricsProps {
     strategyResult: TradingSignal | null;
 }
 
-export const RiskMetrics: React.FC<RiskMetricsProps> = ({ strategyResult }) => {
+export const RiskMetrics: React.FC<RiskMetricsProps> = React.memo(({ strategyResult }) => {
     if (!strategyResult) return null;
 
     return (
@@ -68,4 +68,4 @@ export const RiskMetrics: React.FC<RiskMetricsProps> = ({ strategyResult }) => {
             </div>
         </div>
     );
-};
+});

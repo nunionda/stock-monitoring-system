@@ -10,7 +10,7 @@ interface StockCardProps {
     onRecord: (symbol: string) => void;
 }
 
-export default function StockCard({ symbol, data, name, isFixed, onRecord }: StockCardProps) {
+export default React.memo(function StockCard({ symbol, data, name, isFixed, onRecord }: StockCardProps) {
     const isPositive = (data.change ?? 0) >= 0;
 
     return (
@@ -62,4 +62,4 @@ export default function StockCard({ symbol, data, name, isFixed, onRecord }: Sto
             </div>
         </div>
     );
-}
+});

@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import React, { useState } from 'react';
 import { components } from '../../types/api';
 import { useStockSearch } from '../hooks/useStockSearch';
 import { API_BASE_URL } from '../utils/config';
@@ -12,7 +12,7 @@ interface TradeFormProps {
     market: 'US' | 'KR';
 }
 
-export default function TradeForm({ onTradeAdded, market }: TradeFormProps) {
+export default React.memo(function TradeForm({ onTradeAdded, market }: TradeFormProps) {
     const [stockName, setStockName] = useState('');
     const [type, setType] = useState('Buy');
     const [price, setPrice] = useState('');
@@ -173,4 +173,4 @@ export default function TradeForm({ onTradeAdded, market }: TradeFormProps) {
             </button>
         </form>
     );
-}
+});
